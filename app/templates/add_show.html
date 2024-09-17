@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="add-show-container">
+    <h1 class="text-center">Add Show</h1>
+    <form method="POST" enctype="multipart/form-data" class="d-flex flex-column align-items-center">
+        <div class="mb-3">
+            <label for="name" class="form-label">Name:</label>
+            <input type="text" id="name" name="name" class="form-control" required style="color: black  !important;">
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Description:</label>
+            <textarea id="description" name="description" class="form-control" style="color: black;"></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="poster" class="form-label">Poster:</label>
+            <input type="file" id="poster" name="poster" class="form-control" style="color: black !important;">
+        </div>
+        <div class="mb-3">
+            <label for="logo" class="form-label">Logo:</label>
+            <input type="file" id="logo" name="logo" class="form-control" style="color: black !important;">
+        </div>
+        <div class="mb-3">
+            <label for="banner" class="form-label">Banner:</label>
+            <input type="file" id="banner" name="banner" class="form-control" style="color: black !important;">
+        </div>
+        <div class="mb-3">
+            <label for="theme_color" class="form-label">Theme Color:</label>
+            <input type="color" id="theme_color" name="theme_color" value="#000000" class="form-control" onchange="updateHex(this.value)">
+            <input type="text" id="theme_color_hex" name="theme_color_hex" value="#000000" pattern="^#[0-9A-Fa-f]{6}$" required class="form-control mt-2" style="color: black !important;" oninput="updateColorPicker(this.value)">
+        </div>
+        <div class="mb-3">
+            <label for="air_time" class="form-label">Air Time:</label>
+            <select id="air_day" name="air_day" class="form-select mb-2" style="color: black !important;">
+                <option value="">Select Day</option>
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+                <option value="Saturday">Saturday</option>
+                <option value="Sunday">Sunday</option>
+            </select>
+            <div class="d-flex">
+                <input type="time" id="air_time_et" name="air_time_et" class="form-control me-2" style="color: black !important;">
+                <label for="air_time_et" class="form-label me-3">ET</label>
+                <input type="time" id="air_time_pt" name="air_time_pt" class="form-control me-2" style="color: black !important;">
+                <label for="air_time_pt" class="form-label">PT</label>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Show</button>
+    </form>
+</div>
+{% endblock %}

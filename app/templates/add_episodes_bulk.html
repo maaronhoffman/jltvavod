@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add Episodes in Bulk</title>
+</head>
+<body>
+    <h1>Add Episodes in Bulk</h1>
+ <form method="POST" action="{{ url_for('admin.add_episodes_bulk', show_id=show.id) }}">
+    <textarea name="episode_links" rows="10" cols="50" placeholder="Paste episode links here, one per line"></textarea>
+    <input type="hidden" name="season_id" value="{{ request.args.get('season_id') }}">
+    <button type="submit">Add Episodes</button>
+</form>
+</body>
+</html>

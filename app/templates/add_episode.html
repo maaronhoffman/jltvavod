@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add Episode</title>
+</head>
+<body>
+    <h1>Add Episode</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <div>
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+        <div>
+            <label for="number">Number:</label>
+            <input type="number" id="number" name="number" required>
+        </div>
+        <div>
+            <label for="url">URL:</label>
+            <input type="text" id="url" name="url" required>
+        </div>
+        <div>
+            <label for="description">Description:</label>
+            <textarea id="description" name="description"></textarea>
+        </div>
+        <div>
+            <label for="thumbnail">Thumbnail:</label>
+            <input type="file" id="thumbnail" name="thumbnail">
+        </div>
+        <button type="submit">Add Episode</button>
+    </form>
+</body>
+</html>

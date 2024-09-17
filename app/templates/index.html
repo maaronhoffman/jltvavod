@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Episode Selector - {{ show_name }}</title>
+    <style>
+        .episode-container {
+            display: inline-block;
+            width: 200px;
+            margin: 10px;
+            text-align: center;
+        }
+        .episode-poster {
+            width: 150px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .episode-poster:hover {
+            transform: scale(1.05);
+        }
+        .episode-description {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ show.name }}</h1>
+<img src="{{ show.poster_url }}" alt="{{ show.name }} Poster" style="max-width: 200px;">
+
+<h2>Select a Season:</h2>
+<select id="seasonSelector" onchange="showEpisodes(this.value)">
+    {% for season in show.seasons %}
+        <option value="{{ season.id }}">Season {{ season.number }}</option>
+    {% endfor %}
+</select>
+
+<div id="episodeList">
+    <!-- Episodes will be loaded here dynamically -->
+</div>
+
+<script>
+    function showEpisodes(seasonId) {
+        fetch(`/get_episodes/${seasonId}`)
+            .then(response => response.json())
+            .then(episodes => {
+                const episodeList = document.getElementById('episodeList');
+                episodeList.innerHTML = '';
+                episodes.forEach(episode => {
+                    episodeList.innerHTML += `
+                        <p>
+                            <a href="#" onclick="playEpisode(${episode.id})">${episode.name}</a> - ${episode.description}
+                        </p>`;
+                });
+            });
+    }
+    
+    function playEpisode(episodeId) {
+        // Redirect to the player page with the selected episode
+        window.location.href = `/play/${episodeId}`;
+    }
+    
+    // Load episodes for the first season by default
+    if (document.getElementById('seasonSelector')) {
+        showEpisodes(document.getElementById('seasonSelector').value);
+    }
+    </script>
+
+</body>
+</html>

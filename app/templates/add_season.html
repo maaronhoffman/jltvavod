@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Season to {{ show.name }}</title>
+</head>
+<body>
+    <h1>Add Season to {{ show.name }}</h1>
+    <form method="POST">
+        <label for="number">Season Number:</label>
+        <input type="number" id="number" name="number" required min="1">
+        <br>
+        <input type="submit" value="Add Season">
+    </form>
+    <a href="{{ url_for('admin.manage_show', show_id=show.id) }}">Back to Show</a>
+</body>
+</html>

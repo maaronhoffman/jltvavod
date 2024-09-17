@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="edit-banner-container">
+    <h1>Edit Banner for {{ show.name }}</h1>
+    <form action="{{ url_for('admin.edit_show_banner', show_id=show.id) }}" method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="banner">Upload New Banner:</label>
+            <input type="file" id="banner" name="banner" accept="image/*" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Banner</button>
+    </form>
+    {% if show.banner_poster_url %}
+    <div class="current-banner">
+        <h2>Current Banner:</h2>
+        <img src="{{ show.banner_poster_url }}" alt="{{ show.name }} Banner">
+    </div>
+    {% endif %}
+    <a href="{{ url_for('admin.manage_show', show_id=show.id) }}" class="btn btn-secondary">Back to Show Management</a>
+</div>
+{% endblock %}

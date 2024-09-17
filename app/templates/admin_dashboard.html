@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Admin Dashboard</h1>
+    <div class="admin-actions">
+        <a href="{{ url_for('admin.add_show') }}" class="admin-action-card">
+            <i class="fas fa-plus-circle"></i>
+            <span>Add Show</span>
+        </a>
+        <a href="{{ url_for('admin.admin_database') }}" class="admin-action-card">
+            <i class="fas fa-database"></i>
+            <span>Manage Database</span>
+        </a>
+        <!-- <form action="{{ url_for('admin.update_all_content') }}" method="post">
+            <button type="submit" class="admin-action-card">
+                <i class="fas fa-sync"></i>
+                <span>Update All Content</span>
+            </button>
+        </form> -->
+        <a href="{{ url_for('admin.manage_custom_rows') }}" class="admin-action-card">
+            <i class="fas fa-columns"></i>
+            <span>Manage Rows</span>
+        </a>
+        <a href="{{ url_for('auth.logout') }}" class="admin-action-card">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Logout</span>
+        </a>
+       
+
+    </div>
+
+    <h2>Existing Shows</h2>
+    <div class="admin-shows-container">
+        {% for show in shows %}
+        <a href="{{ url_for('admin.manage_show', show_id=show.id) }}" class="admin-show-item">
+            <div class="image-wrapper">
+                <img src="{{ show.poster_url }}" alt="{{ show.name }}">
+            </div>
+            <div class="show-title-wrapper">
+                <h3 class="show-title">{{ show.name }}</h3>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+{% endblock %}

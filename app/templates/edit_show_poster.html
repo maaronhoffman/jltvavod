@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Show Poster</title>
+</head>
+<body>
+    <h1>Edit Poster for {{ show.name }}</h1>
+    <form action="{{ url_for('admin.edit_show_poster', show_id=show.id) }}" method="POST" enctype="multipart/form-data">
+        <input type="file" name="poster" accept="image/*" required>
+        <button type="submit">Upload New Poster</button>
+    </form>
+    <a href="{{ url_for('admin.manage_show', show_id=show.id) }}">Back to Show Management</a>
+</body>
+</html>

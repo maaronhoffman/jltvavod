@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Edit Episode Thumbnail</h1>
+<h2>{{ episode.name }}</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    <h3>Option 1: Update Thumbnail from API</h3>
+    <button type="submit" name="update_url">Update from API</button>
+
+    <h3>Option 2: Upload Local File</h3>
+    <div>
+        <label for="thumbnail">Upload New Thumbnail:</label>
+        <input type="file" id="thumbnail" name="thumbnail" accept="image/*">
+    </div>
+    <button type="submit" name="upload_file">Upload File</button>
+</form>
+
+<h3>Current Thumbnail</h3>
+{% if episode.thumbnail_url %}
+    <img src="{{ episode.thumbnail_url }}" alt="Current Thumbnail" style="max-width: 300px;">
+{% else %}
+    <p>No thumbnail currently set.</p>
+{% endif %}
+
+<a href="{{ url_for('admin.manage_show', show_id=episode.season.show_id) }}">Back to Show Management</a>
+{% endblock %}

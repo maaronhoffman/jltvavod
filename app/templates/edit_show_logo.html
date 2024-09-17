@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>Edit Show Logo</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="logo">Upload New Logo</label>
+            <input type="file" class="form-control-file" id="logo" name="logo">
+        </div>
+        <button type="submit" class="btn btn-primary">Update Logo</button>
+    </form>
+</div>
+{% endblock %}

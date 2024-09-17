@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="manage-show-container">
+    <h1 class="text-center">Manage {{ show.name }}</h1>
+    <div class="show-details d-flex flex-column align-items-center">
+        <img src="{{ show.poster_url }}" alt="{{ show.name }} Poster" class="show-poster mb-3">
+        <div class="show-actions d-flex flex-column align-items-center">
+            <div class="btn-group mb-3">
+            <a href="{{ url_for('admin.edit_show_poster', show_id=show.id) }}" class="btn btn-primary mb-2">Edit Poster</a>
+            <a href="{{ url_for('admin.edit_show_logo', show_id=show.id) }}" class="btn btn-primary mb-2">Edit Logo</a>
+            <a href="{{ url_for('admin.edit_show_banner', show_id=show.id) }}" class="btn btn-primary mb-2">Edit Banner</a>
+            </div>
+            <div class="row mb-3">
+                
+            <form action="{{ url_for('admin.update_theme_color', show_id=show.id) }}" method="POST" class="mb-2">
+                <label for="theme_color">Theme Color:</label>
+                <input type="color" id="theme_color" name="theme_color" value="{{ show.theme_color or '#000000' }}" onchange="updateHex(this.value)">
+                <input type="text" id="theme_color_hex" name="theme_color_hex" value="{{ show.theme_color or '#000000' }}" pattern="^#[0-9A-Fa-f]{6}$" required style="color: black;" oninput="updateColorPicker(this.value)">
+                <button type="submit" class="btn btn-primary">Update Theme Color</button>
+            </form>
+            
+            <div class="col-md-6"></div>
+            <form action="{{ url_for('admin.update_airtime', show_id=show.id) }}" method="POST" class="mb-2">
+                <label for="air_time" class="form-label">Air Time:</label>
+                {% set air_time_parts = show.air_time.split() if show.air_time else ['', '', '', ''] %}
+                <select id="air_day" name="air_day" class="form-select mb-2" style="color: black !important;">
+                    <option value="">Select Day</option>
+                    {% for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+                        <option value="{{ day }}" {% if day == air_time_parts[0] %}selected{% endif %}>{{ day }}</option>
+                    {% endfor %}
+                </select>
+                <div class="d-flex">
+                    <input type="time" id="air_time_et" name="air_time_et" class="form-control me-2"  value="{{ air_time_parts[1] }}">
+                    <label for="air_time_et" class="form-label me-3">ET</label>
+                    <input type="time" id="air_time_pt" name="air_time_pt" class="form-control me-2"  value="{{ air_time_parts[3] }}">
+                    <label for="air_time_pt" class="form-label">PT</label>
+                </div>
+                <button type="submit" class="btn btn-primary mt-2">Update Air Time</button>
+            </form>
+            </div>
+            
+            <form action="{{ url_for('admin.delete_show', show_id=show.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this show?')" class="mb-2">
+                <button type="submit" class="btn btn-danger">Delete Show</button>
+            </form>
+            <form action="{{ url_for('admin.update_all_episodes', show_id=show.id) }}" method="POST">
+                <button type="submit" class="btn btn-secondary">Update All Episodes</button>
+            </form>
+        </div>
+    </div>
+
+    <h2 class="text-center mt-4">Seasons</h2>
+    {% if show.seasons %}
+        <div class="seasons-container d-flex flex-column align-items-center">
+        {% for season in show.seasons %}
+            <div class="season-card mb-4 w-100 text-center">
+                <h3>Season {{ season.number }}</h3>
+                <form action="{{ url_for('admin.delete_season', season_id=season.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this season?')" class="mb-3">
+                    <button type="submit" class="btn btn-danger">Delete Season</button>
+                </form>
+                
+                {% if season.episodes %}
+                <div class="episodes-container manage-show-episodes">
+                    {% for episode in season.episodes %}
+                        <div class="episode-card" data-description="{{ episode.description }}">
+                            <div class="episode-thumbnail" style="background-image: url('{{ episode.thumbnail_url }}');">
+                                <div class="episode-overlay">
+                                    <h4 class="episode-title">{{ episode.name }}</h4>
+                                    <a href="#" class="read-more" data-episode-id="{{ episode.id }}">Read More</a>
+                                </div>
+                            </div>
+                            <div class="episode-actions">
+                                <a href="{{ url_for('admin.edit_episode_thumbnail', episode_id=episode.id) }}" class="btn btn-primary">Edit Thumbnail</a>
+                                <form action="{{ url_for('admin.delete_episode', episode_id=episode.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this episode?')">
+                                    <button type="submit" class="btn btn-danger">Delete Episode</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                
+                <div id="description-popup" class="description-popup">
+                    <div class="popup-content">
+                        <span class="close-popup">&times;</span>
+                        <h4 id="popup-title"></h4>
+                        <p id="popup-description"></p>
+                    </div>
+                </div>
+                
+                {% else %}
+                    <p>No episodes in this season yet.</p>
+                {% endif %}
+                <div class="season-actions">
+                    <!-- <a href="{{ url_for('admin.add_episode', show_id=show.id, season_id=season.id) }}" class="btn btn-success mb-2">Add Episode</a> -->
+                    <a href="{{ url_for('admin.add_episodes_bulk', show_id=show.id, season_id=season.id) }}" class="btn btn-success">Add Episodes</a>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-center">No seasons added yet.</p>
+    {% endif %}
+    <div class="d-flex justify-content-center mt-4">
+        <a href="{{ url_for('admin.add_season', show_id=show.id) }}" class="btn btn-primary mr-2">Add New Season</a>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}

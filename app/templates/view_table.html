@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>View Table: {{ table_name }}</title>
+</head>
+<body>
+    <h1>{{ table_name }}</h1>
+    <table border="1">
+        <tr>
+            {% for column in columns %}
+                <th>{{ column }}</th>
+            {% endfor %}
+            <th>Actions</th>
+        </tr>
+        {% for record in records %}
+            <tr>
+                {% for column in columns %}
+                    <td>{{ record[column] }}</td>
+                {% endfor %}
+                <td>
+                    <a href="{{ url_for('admin.edit_record', table_name=table_name, record_id=record.id|string) }}">Edit</a>
+                </td>
+            </tr>
+        {% endfor %}
+    </table>
+    <a href="{{ url_for('admin.admin_database') }}">Back to Database Management</a>
+</body>
+</html>
