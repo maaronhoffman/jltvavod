@@ -38,12 +38,13 @@ def init_episode(episode_id, show_id):
     
     scte_markers = process_media_playlist(selected_episode_url)
 
-    return render_template('player.html', 
+    response = render_template('player.html', 
                            scte_message=scte_message, 
                            episode_url=selected_episode_url,
                            episode=episode,
                            show=show,
                            scte_markers=json.dumps(scte_markers))
+    return response, {'Permissions-Policy': 'browsing-topics=()'}
 
 @bp.route('/status')
 def status():

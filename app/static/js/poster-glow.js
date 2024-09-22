@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const colorThief = new ColorThief();
     const showItems = document.querySelectorAll('.show-item');
     const episodeThumbnails = document.querySelectorAll('.show-detail-episode-thumbnail');
@@ -32,7 +32,7 @@ function setGlowColor(item, img, colorThief) {
         try {
             const dominantColor = colorThief.getColor(img);
             const [r, g, b] = dominantColor;
-            
+
             // Increase brightness while maintaining hue
             const brightness = Math.max(r, g, b);
             const scale = Math.max(1, 255 / brightness);
@@ -41,7 +41,7 @@ function setGlowColor(item, img, colorThief) {
                 Math.min(255, Math.round(g * scale)),
                 Math.min(255, Math.round(b * scale))
             ];
-            
+
             const glowColor = `rgba(${adjustedColor[0]}, ${adjustedColor[1]}, ${adjustedColor[2]}, 0.3)`;
             item.style.setProperty('--glow-color', glowColor);
             console.log(`Glow color set for ${img.alt}: ${glowColor}`);
