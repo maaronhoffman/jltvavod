@@ -46,24 +46,25 @@ def episodes(args):
     response = make_request(url, data)
     return response.json() if response and response.status_code == 200 else []
 
-parser = argparse.ArgumentParser(description="Fetch media information")
-subparsers = parser.add_subparsers(title="subcommands", dest="subcommand")
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Fetch media information")
+    subparsers = parser.add_subparsers(title="subcommands", dest="subcommand")
 
-series_parser = subparsers.add_parser("series", help="Fetch series information")
+    series_parser = subparsers.add_parser("series", help="Fetch series information")
 
-seasons_parser = subparsers.add_parser("seasons", help="Fetch seasons information")
-
-
-episodes_parser = subparsers.add_parser("episodes", help="Fetch episodes information")
+    seasons_parser = subparsers.add_parser("seasons", help="Fetch seasons information")
 
 
-args = parser.parse_args()
+    episodes_parser = subparsers.add_parser("episodes", help="Fetch episodes information")
 
-if args.subcommand == "series":
-    series(args)
-elif args.subcommand == "seasons":
-    seasons(args)
-elif args.subcommand == "episodes":
-    episodes(args)
-else:
-    parser.print_help()
+
+    args = parser.parse_args()
+
+    if args.subcommand == "series":
+        series(args)
+    elif args.subcommand == "seasons":
+        seasons(args)
+    elif args.subcommand == "episodes":
+        episodes(args)
+    else:
+        parser.print_help()
