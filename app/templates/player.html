@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Player</title>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://vjs.zencdn.net/7.10.2/video.min.js"></script>
-    <link href="https://vjs.zencdn.net/7.10.2/video-js.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.6.8/plyr.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <style>
@@ -17,328 +15,94 @@
             height: 100%;
             overflow: hidden;
         }
-        #video-container {
-            position: absolute;
-            top: 0;
-            left: 0;
+        #player {
             width: 100%;
             height: 100%;
         }
-        .video-js {
-            width: 100% !important;
-            height: 100% !important;
-            
+        .episode-name-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            z-index: 10;
         }
-        .video-js .vjs-big-play-button {
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        .vjs-controls-hidden .vjs-control-bar {
-            display: none !important;
-        }
-        .vjs-control-bar {
-            padding-top: 15px;
-            padding-bottom: 15px;
-            background-color: rgba(26, 26, 26, 0.7) !important;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            height: 60px !important;
-            
-        }
-
-        .vjs-icon-play:before {
-            content: url('/static/images/play.svg') !important;
-        }
-
-        .video-js .vjs-play-progress {
-            /* Accent color for progress */
-            background-color: #00a0ff;
-        }
-
-        .video-js .vjs-progress-holder {
-            /* Dark mode progress bar */
-            background-color: rgba(255, 255, 255, 0.3);
-        }
-
         .show-title-player {
             font-size: 24px;
             margin: 0 0 5px 0;
-            margin-top: 20px;
-            color: white;
             font-weight: bold;
         }
-
         .episode-title-player {
             font-size: 18px;
-            margin-top: -12px;
             color: #ccc;
         }
     </style>
 </head>
 <body>
-  
-    <div id="video-container">
-        
-        <video id="my-video" class="video-js" controls preload="auto">
+    <div id="player-container">
+        <video id="player" playsinline controls>
             <source src="{{ episode_url }}" type="application/x-mpegURL">
         </video>
         <div id="episode-name" class="episode-name-overlay">
-            <div class="show-info-header">
-                <h1 class="show-title-player">{{ show.name }}</h1>
-                <h2 class="episode-title-player">{{ episode.name }}</h2>
-            </div>
+            <h1 class="show-title-player">{{ show.name }}</h1>
+            <h2 class="episode-title-player">{{ episode.name }}</h2>
         </div>
-        <div id="ad-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000;"></div>
     </div>
 
+    <script src="https://cdn.plyr.io/3.6.8/plyr.polyfilled.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
     <script>
-        const IMA_SDK_URL = 'https://imasdk.googleapis.com/js/sdkloader/ima3.js';
-        const MAX_RETRIES = 3;
-        let adPlayed = false;
-        let player, adContainer, adPlaying, scteMarkers, adsManager, adsLoader, lastPlayedCuePoint;
-        let imaSDKLoaded = false;
-        let mouseTimer;
-        const adRequestQueue = [];
-
-        function initializePlayer() {
-            player = videojs('my-video', { autoplay: true, muted: true });
-
-            adContainer = document.getElementById('ad-container');
-            adContainer.style.display = 'none'; // Initially hide the ad container
-            adPlaying = false;
-            adPlayed = false; // Initialize the new variable
-            scteMarkers = {{ scte_markers|safe }};
-            lastPlayedCuePoint = -1;
-
-            player.on('timeupdate', handleTimeUpdate);
-            player.on('seeking', handleSeeking);
-
-            loadIMASDK(initIMA);
+        document.addEventListener('DOMContentLoaded', () => {
+            const video = document.getElementById('player');
             const episodeNameOverlay = document.getElementById('episode-name');
-            const episodeNameH2 = episodeNameOverlay.querySelector('h2');
-            episodeNameH2.textContent = "{{ episode.name }}";
-            console.log("Set episode name:", episodeNameOverlay.textContent);
-            // Ensure autoplay
-            player.ready(function() {
-            player.on('play', function() {
-                if (adPlaying) {
-                player.pause();
-            }
-                showEpisodeName();
-                setTimeout(hideEpisodeName, 3000);
-               
-                
-            });
-            });
-            player.on('pause', hideEpisodeName);
-            player.el().addEventListener('mousemove', handleMouseMove);
-            player.el().addEventListener('mouseenter', handleMouseEnter);
-            player.el().addEventListener('mouseleave', handleMouseLeave);
-        }
 
-        function handleMouseMove() {
-            console.log("Mouse moved");
-            showEpisodeName();
-            resetMouseTimer();
-        }
-
-        function handleMouseEnter() {
-            console.log("Mouse entered");
-            showEpisodeName();
-            resetMouseTimer();
-        }
-
-        function handleMouseLeave() {
-            console.log("Mouse left");
-            hideEpisodeName();
-            clearTimeout(mouseTimer);
-        }
-
-        function resetMouseTimer() {
-            console.log("Resetting mouse timer");
-            clearTimeout(mouseTimer);
-            mouseTimer = setTimeout(() => {
-                console.log("Mouse timer expired");
-                hideEpisodeName();
-            }, 2000);
-        }
-        
-        function showEpisodeName() {
-            const episodeNameOverlay = document.getElementById('episode-name');
-            episodeNameOverlay.style.opacity = '1';
-        }
-
-        function hideEpisodeName() {
-            const episodeNameOverlay = document.getElementById('episode-name');
-            episodeNameOverlay.style.opacity = '0';
-        }
-        
-
-        function loadIMASDK(callback) {
-            const script = document.createElement('script');
-            script.src = IMA_SDK_URL;
-            script.async = true;
-            script.onload = () => {
-                imaSDKLoaded = true;
-                callback();
-                processAdQueue();
-            };
-            script.onerror = () => {
-                // Implement fallback behavior or user notification
-            };
-            document.head.appendChild(script);
-        }
-
-        function initIMA() {
-            if (typeof google === 'undefined' || typeof google.ima === 'undefined') {
-                return;
+            let hls;
+            if (Hls.isSupported()) {
+                hls = new Hls();
+                hls.loadSource('{{ episode_url }}');
+                hls.attachMedia(video);
             }
 
-            const adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
-            adDisplayContainer.initialize();
-
-            adsLoader = new google.ima.AdsLoader(adDisplayContainer);
-            adsLoader.addEventListener(
-                google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-                onAdsManagerLoaded,
-                false);
-            adsLoader.addEventListener(
-                google.ima.AdErrorEvent.Type.AD_ERROR,
-                onAdError,
-                false);
-        }
-
-        function requestAds() {
-    if (!imaSDKLoaded) {
-        adRequestQueue.push(true);
-        return;
-    }
-
-    const vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?site_id=49382&site_page=[SITE_PAGE]&format=vast&pod_duration=[POD_DURATION]&cb=[CACHEBUSTER]&ip=[IP]&ua=[UA]&player_height=[HEIGHT]&player_width=[WIDTH]&is_lat=[LIMITED_AD_TRACKING]&site_name=[CHANNEL_NAME]&content_cat=[CONTENT_CAT]&content_channel=[CONTENT_CHANNEL]&content_context=[CONTENT_CONTEXT]&content_dist_id=[CONTENT_DIST_ID]&content_dist_name=[CONTENT_DIST_NAME]&content_episode=[CONTENT_EPISODE]&content_genre=[CONTENT_GENRE]&content_id=[CONTENT_ID]&content_keywords=[CONTENT_KEYWORDS]&content_language=[CONTENT_LANGUAGE]&content_length=[CONTENT_LENGTH]&content_network=[CONTENT_NETWORK]&content_prodqual=[CONTENT_PROD]&content_producer_id=[CONTENT_PRODUCER_ID]&content_producer=[CONTENT_PRODUCER_NAME]&content_rating=[CONTENT_RATING]&content_season=[CONTENT_SEASON]&content_series=[CONTENT_SERIES]&content_title=[CONTENT_TITLE]&content_url=[CONTENT_URL]&buyeruid=[BUYERUID]&us_privacy=[US_PRIVACY]&consent=[CONSENT]&coppa=[COPPA]&custom_5=[CUSTOM_5]&custom_6=[CUSTOM_6]&custom_7=[CUSTOM_7]&custom_8=[CUSTOM_8]&custom_9=[CUSTOM_9]&custom_10=[CUSTOM_10]&custom_11=[CUSTOM_11]&custom_12=[CUSTOM_12]&custom_13=[CUSTOM_13]&custom_14=[CUSTOM_14]&custom_15=[CUSTOM_15]&custom_16=[CUSTOM_16]&custom_17=[CUSTOM_17]&custom_18=[CUSTOM_18]&device_language=[DEVICE_LANGUAGE]&lat=[LAT]&lon=[LON]&device_type=[DEVICE_TYPE]&gdpr=[GDPR]&gender=[GENDER]&genre_id=[GENRE_ID]&ifa_type=[IFA_TYPE]&iris_context=[IRIS_CONTEXT]&iris_id=[IRIS_ID]&livestream=[LIVESTREAM]&max_bitrate=[MAXBITRATE]&min_bitrate=[MINBITRATE]&partner_domain=[PARTNER_DOMAIN]&position=[POSITION]&preferred_language=[PREFERRED_LANGUAGE]&rights_holder=[RIGHTS_HOLDER]&ssai_enabled=[SSAI_ENABLED]&ssai_vendor=[SSAI_VENDOR]&session_id=[SESSION_ID]&schain=[SCHAIN]&yob=[YOB]';
-
-    const adsRequest = new google.ima.AdsRequest();
-    adsRequest.adTagUrl = vastUrl;
-    adsRequest.linearAdSlotWidth = player.el().offsetWidth;
-    adsRequest.linearAdSlotHeight = player.el().offsetHeight;
-    adsRequest.nonLinearAdSlotWidth = player.el().offsetWidth;
-    adsRequest.nonLinearAdSlotHeight = player.el().offsetHeight;
-
-    adsLoader.requestAds(adsRequest);
-}
-
-
-        
-
-
-
-        function processAdQueue() {
-            while (adRequestQueue.length > 0) {
-                adRequestQueue.shift();
-                requestAds();
-            }
-        }
-
-        function onAdsManagerLoaded(adsManagerLoadedEvent) {
-            adsManager = adsManagerLoadedEvent.getAdsManager(player.el());
-            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
-            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
-            adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError);
-            adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, onAllAdsCompleted);
-            adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdEnded);
-
-            try {
-                adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
-                adsManager.start();
-            } catch (adError) {
-                player.play();
-            }
-        }
-
-        function onAdEnded() {
-            if (adPlayed) {
-                adContainer.style.display = 'none';
-            }
-            player.el().style.pointerEvents = 'auto';
-            player.controls(true);
-        }
-
-        function onContentPauseRequested() {
-            player.pause();
-            player.tech_.el_.pause(); // Force pause on the underlying video element
-            player.muted(true);
-            player.controls(false);
-            player.el().style.pointerEvents = 'none';
-            adContainer.style.display = 'block';
-            adPlaying = true;
-        }
-
-        function onContentResumeRequested() {
-            player.removeClass('vjs-controls-hidden');
-            player.muted(false);
-            player.controls(true);
-            player.el().style.pointerEvents = 'auto';
-            adContainer.style.display = 'none';
-            adPlaying = false;
-            if (savedTime !== undefined) {
-                player.currentTime(savedTime);
-                savedTime = undefined;
-            }
-            player.play();
-        }
-        function onAdError(adErrorEvent) {
-            if (adsManager) {
-                adsManager.destroy();
-            }
-            adPlaying = false;
-            player.play();
-        }
-
-        function onAllAdsCompleted() {
-            adPlaying = false;
-            player.removeClass('vjs-controls-hidden');
-            player.play();
-        }
-
-        function handleTimeUpdate() {
-            const currentTime = player.currentTime();
-            scteMarkers.forEach((marker, index) => {
-                if (currentTime >= marker.time && index > lastPlayedCuePoint && !adPlaying) {
-                    adPlaying = true;
-                    lastPlayedCuePoint = index;
-                    player.pause();
-                    requestAds();
+            const player = new Plyr(video, {
+                ads: {
+                    enabled: true,
+                    tagUrl: 'https://obs.ads.ottera.tv/v1/s2s-hb?site_id=49382&site_page=[SITE_PAGE]&format=vast&pod_duration=[POD_DURATION]&cb=[CACHEBUSTER]&ip=[IP]&ua=[UA]&player_height=[HEIGHT]&player_width=[WIDTH]&is_lat=[LIMITED_AD_TRACKING]&site_name=[CHANNEL_NAME]&content_cat=[CONTENT_CAT]&content_channel=[CONTENT_CHANNEL]&content_context=[CONTENT_CONTEXT]&content_dist_id=[CONTENT_DIST_ID]&content_dist_name=[CONTENT_DIST_NAME]&content_episode=[CONTENT_EPISODE]&content_genre=[CONTENT_GENRE]&content_id=[CONTENT_ID]&content_keywords=[CONTENT_KEYWORDS]&content_language=[CONTENT_LANGUAGE]&content_length=[CONTENT_LENGTH]&content_network=[CONTENT_NETWORK]&content_prodqual=[CONTENT_PROD]&content_producer_id=[CONTENT_PRODUCER_ID]&content_producer=[CONTENT_PRODUCER_NAME]&content_rating=[CONTENT_RATING]&content_season=[CONTENT_SEASON]&content_series=[CONTENT_SERIES]&content_title=[CONTENT_TITLE]&content_url=[CONTENT_URL]&buyeruid=[BUYERUID]&us_privacy=[US_PRIVACY]&consent=[CONSENT]&coppa=[COPPA]&custom_5=[CUSTOM_5]&custom_6=[CUSTOM_6]&custom_7=[CUSTOM_7]&custom_8=[CUSTOM_8]&custom_9=[CUSTOM_9]&custom_10=[CUSTOM_10]&custom_11=[CUSTOM_11]&custom_12=[CUSTOM_12]&custom_13=[CUSTOM_13]&custom_14=[CUSTOM_14]&custom_15=[CUSTOM_15]&custom_16=[CUSTOM_16]&custom_17=[CUSTOM_17]&custom_18=[CUSTOM_18]&device_language=[DEVICE_LANGUAGE]&lat=[LAT]&lon=[LON]&device_type=[DEVICE_TYPE]&gdpr=[GDPR]&gender=[GENDER]&genre_id=[GENRE_ID]&ifa_type=[IFA_TYPE]&iris_context=[IRIS_CONTEXT]&iris_id=[IRIS_ID]&livestream=[LIVESTREAM]&max_bitrate=[MAXBITRATE]&min_bitrate=[MINBITRATE]&partner_domain=[PARTNER_DOMAIN]&position=[POSITION]&preferred_language=[PREFERRED_LANGUAGE]&rights_holder=[RIGHTS_HOLDER]&ssai_enabled=[SSAI_ENABLED]&ssai_vendor=[SSAI_VENDOR]&session_id=[SESSION_ID]&schain=[SCHAIN]&yob=[YOB]'
                 }
             });
-        }
 
-        let savedTime;
+            const scteMarkers = {{ scte_markers|safe }};
+            let lastPlayedCuePoint = -1;
 
-        function handleSeeking() {
-            const currentTime = player.currentTime();
-            const bufferTime = 0.5;
+            player.on('timeupdate', () => {
+                const currentTime = player.currentTime;
+                scteMarkers.forEach((marker, index) => {
+                    if (currentTime >= marker.time && index > lastPlayedCuePoint) {
+                        lastPlayedCuePoint = index;
+                        player.pause();
+                        player.ads.play();
+                    }
+                });
+            });
 
-            lastPlayedCuePoint = scteMarkers.findIndex(marker => marker.time > currentTime) - 1;
-            lastPlayedCuePoint = Math.max(-1, Math.min(lastPlayedCuePoint, scteMarkers.length - 1));
+            player.on('play', () => {
+                episodeNameOverlay.style.display = 'block';
+                setTimeout(() => {
+                    episodeNameOverlay.style.display = 'none';
+                }, 3000);
+            });
 
-            const nextCuePoint = scteMarkers[lastPlayedCuePoint + 1];
-            if (nextCuePoint && currentTime >= nextCuePoint.time - bufferTime && !adPlaying) {
-                player.pause();
-                adPlaying = true;
-                savedTime = currentTime; // Save the current time
-                requestAds();
-            }
-        }
+            player.on('pause', () => {
+                episodeNameOverlay.style.display = 'none';
+            });
 
+            player.on('adsready', () => {
+                console.log('Ads are ready to be played');
+            });
 
-        window.addEventListener('resize', function() {
-            if (adsManager) {
-                adsManager.resize(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
-            }
+            player.on('adserror', (error) => {
+                console.error('Ad error:', error);
+            });
         });
-
-
-        initializePlayer();
     </script>
 </body>
 </html>
