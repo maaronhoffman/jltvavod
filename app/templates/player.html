@@ -210,22 +210,22 @@
         }
 
         function requestAds() {
-            if (!imaSDKLoaded) {
-                adRequestQueue.push(true);
-                return;
-            }
+    if (!imaSDKLoaded) {
+        adRequestQueue.push(true);
+        return;
+    }
 
-            const vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?site_id=49382&site_page=[SITE_PAGE]&format=vast&pod_duration=[POD_DURATION]&cb=[CACHEBUSTER]&ip=[IP]&ua=[UA]&player_height=[HEIGHT]&player_width=[WIDTH]&is_lat=[LIMITED_AD_TRACKING]&site_name=[CHANNEL_NAME]&content_cat=[CONTENT_CAT]&content_channel=[CONTENT_CHANNEL]&content_context=[CONTENT_CONTEXT]&content_dist_id=[CONTENT_DIST_ID]&content_dist_name=[CONTENT_DIST_NAME]&content_episode=[CONTENT_EPISODE]&content_genre=[CONTENT_GENRE]&content_id=[CONTENT_ID]&content_keywords=[CONTENT_KEYWORDS]&content_language=[CONTENT_LANGUAGE]&content_length=[CONTENT_LENGTH]&content_network=[CONTENT_NETWORK]&content_prodqual=[CONTENT_PROD]&content_producer_id=[CONTENT_PRODUCER_ID]&content_producer=[CONTENT_PRODUCER_NAME]&content_rating=[CONTENT_RATING]&content_season=[CONTENT_SEASON]&content_series=[CONTENT_SERIES]&content_title=[CONTENT_TITLE]&content_url=[CONTENT_URL]&buyeruid=[BUYERUID]&us_privacy=[US_PRIVACY]&consent=[CONSENT]&coppa=[COPPA]&custom_5=[CUSTOM_5]&custom_6=[CUSTOM_6]&custom_7=[CUSTOM_7]&custom_8=[CUSTOM_8]&custom_9=[CUSTOM_9]&custom_10=[CUSTOM_10]&custom_11=[CUSTOM_11]&custom_12=[CUSTOM_12]&custom_13=[CUSTOM_13]&custom_14=[CUSTOM_14]&custom_15=[CUSTOM_15]&custom_16=[CUSTOM_16]&custom_17=[CUSTOM_17]&custom_18=[CUSTOM_18]&device_language=[DEVICE_LANGUAGE]&lat=[LAT]&lon=[LON]&device_type=[DEVICE_TYPE]&gdpr=[GDPR]&gender=[GENDER]&genre_id=[GENRE_ID]&ifa_type=[IFA_TYPE]&iris_context=[IRIS_CONTEXT]&iris_id=[IRIS_ID]&livestream=[LIVESTREAM]&max_bitrate=[MAXBITRATE]&min_bitrate=[MINBITRATE]&partner_domain=[PARTNER_DOMAIN]&position=[POSITION]&preferred_language=[PREFERRED_LANGUAGE]&rights_holder=[RIGHTS_HOLDER]&ssai_enabled=[SSAI_ENABLED]&ssai_vendor=[SSAI_VENDOR]&session_id=[SESSION_ID]&schain=[SCHAIN]&yob=[YOB]';
+    const vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?site_id=49382&site_page=[SITE_PAGE]&format=vast&pod_duration=[POD_DURATION]&cb=[CACHEBUSTER]&ip=[IP]&ua=[UA]&player_height=[HEIGHT]&player_width=[WIDTH]&is_lat=[LIMITED_AD_TRACKING]&site_name=[CHANNEL_NAME]&content_cat=[CONTENT_CAT]&content_channel=[CONTENT_CHANNEL]&content_context=[CONTENT_CONTEXT]&content_dist_id=[CONTENT_DIST_ID]&content_dist_name=[CONTENT_DIST_NAME]&content_episode=[CONTENT_EPISODE]&content_genre=[CONTENT_GENRE]&content_id=[CONTENT_ID]&content_keywords=[CONTENT_KEYWORDS]&content_language=[CONTENT_LANGUAGE]&content_length=[CONTENT_LENGTH]&content_network=[CONTENT_NETWORK]&content_prodqual=[CONTENT_PROD]&content_producer_id=[CONTENT_PRODUCER_ID]&content_producer=[CONTENT_PRODUCER_NAME]&content_rating=[CONTENT_RATING]&content_season=[CONTENT_SEASON]&content_series=[CONTENT_SERIES]&content_title=[CONTENT_TITLE]&content_url=[CONTENT_URL]&buyeruid=[BUYERUID]&us_privacy=[US_PRIVACY]&consent=[CONSENT]&coppa=[COPPA]&custom_5=[CUSTOM_5]&custom_6=[CUSTOM_6]&custom_7=[CUSTOM_7]&custom_8=[CUSTOM_8]&custom_9=[CUSTOM_9]&custom_10=[CUSTOM_10]&custom_11=[CUSTOM_11]&custom_12=[CUSTOM_12]&custom_13=[CUSTOM_13]&custom_14=[CUSTOM_14]&custom_15=[CUSTOM_15]&custom_16=[CUSTOM_16]&custom_17=[CUSTOM_17]&custom_18=[CUSTOM_18]&device_language=[DEVICE_LANGUAGE]&lat=[LAT]&lon=[LON]&device_type=[DEVICE_TYPE]&gdpr=[GDPR]&gender=[GENDER]&genre_id=[GENRE_ID]&ifa_type=[IFA_TYPE]&iris_context=[IRIS_CONTEXT]&iris_id=[IRIS_ID]&livestream=[LIVESTREAM]&max_bitrate=[MAXBITRATE]&min_bitrate=[MINBITRATE]&partner_domain=[PARTNER_DOMAIN]&position=[POSITION]&preferred_language=[PREFERRED_LANGUAGE]&rights_holder=[RIGHTS_HOLDER]&ssai_enabled=[SSAI_ENABLED]&ssai_vendor=[SSAI_VENDOR]&session_id=[SESSION_ID]&schain=[SCHAIN]&yob=[YOB]';
 
-            const adsRequest = new google.ima.AdsRequest();
-            adsRequest.adTagUrl = vastUrl;
-            adsRequest.linearAdSlotWidth = player.el().offsetWidth;
-            adsRequest.linearAdSlotHeight = player.el().offsetHeight;
-            adsRequest.nonLinearAdSlotWidth = player.el().offsetWidth;
-            adsRequest.nonLinearAdSlotHeight = player.el().offsetHeight;
+    const adsRequest = new google.ima.AdsRequest();
+    adsRequest.adTagUrl = vastUrl;
+    adsRequest.linearAdSlotWidth = player.el().offsetWidth;
+    adsRequest.linearAdSlotHeight = player.el().offsetHeight;
+    adsRequest.nonLinearAdSlotWidth = player.el().offsetWidth;
+    adsRequest.nonLinearAdSlotHeight = player.el().offsetHeight;
 
-            adsLoader.requestAds(adsRequest);
-        }
+    adsLoader.requestAds(adsRequest);
+}
 
 
         
