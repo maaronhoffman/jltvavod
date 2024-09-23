@@ -102,23 +102,7 @@
         }
 
         function initializePlayer() {
-            var video = document.getElementById('my-video');
-   if (Hls.isSupported()) {
-        // Use HLS.js if native support is not available
-        var hls = new Hls();
-        hls.loadSource("{{ episode_url }}");
-        hls.attachMedia(video);
-    }
-
-    player = videojs('my-video', { 
-        autoplay: 'any', 
-        muted: true,
-        playsinline: true,
-        controls: true,
-        fullscreen: {
-            enabled: false
-        } 
-    });
+            player = videojs('my-video', { autoplay: true, muted: true });
             adContainer = document.getElementById('ad-container');
             adContainer.style.display = 'none';
             adPlaying = false;
