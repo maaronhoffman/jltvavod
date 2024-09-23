@@ -308,11 +308,14 @@
                     adPlaying = true;
                     lastPlayedCuePoint = index;
                     player.pause();
-                    requestAds();
+                    // Add a small delay here
+                    setTimeout(() => {
+                        requestAds();
+                    }, 100); // 100ms delay, adjust as needed
                 }
             });
         }
-
+         
         let savedTime;
 
         function handleSeeking() {
