@@ -27,7 +27,6 @@
         .video-js {
             width: 100% !important;
             height: 100% !important;
-            
         }
         .video-js .vjs-big-play-button {
             top: 50%;
@@ -44,23 +43,16 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             height: 60px !important;
-            
         }
-
         .vjs-icon-play:before {
             content: url('/static/images/play.svg') !important;
         }
-
         .video-js .vjs-play-progress {
-            /* Accent color for progress */
             background-color: #00a0ff;
         }
-
         .video-js .vjs-progress-holder {
-            /* Dark mode progress bar */
             background-color: rgba(255, 255, 255, 0.3);
         }
-
         .show-title-player {
             font-size: 24px;
             margin: 0 0 5px 0;
@@ -68,7 +60,6 @@
             color: white;
             font-weight: bold;
         }
-
         .episode-title-player {
             font-size: 18px;
             margin-top: -12px;
@@ -77,9 +68,7 @@
     </style>
 </head>
 <body>
-  
     <div id="video-container">
-        
         <video id="my-video" class="video-js" controls preload="auto">
             <source src="{{ episode_url }}" type="application/x-mpegURL">
         </video>
@@ -100,16 +89,24 @@
         let imaSDKLoaded = false;
         let mouseTimer;
         const adRequestQueue = [];
+        let sessionId;
+        let savedTime;
+
+        function generateSessionId() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2);
+        }
 
         function initializePlayer() {
             player = videojs('my-video', { autoplay: true, muted: true });
 
             adContainer = document.getElementById('ad-container');
-            adContainer.style.display = 'none'; // Initially hide the ad container
+            adContainer.style.display = 'none';
             adPlaying = false;
-            adPlayed = false; // Initialize the new variable
+            adPlayed = false;
             scteMarkers = {{ scte_markers|safe }};
             lastPlayedCuePoint = -1;
+            sessionId = generateSessionId();
+            adRequestQueue.length = 0;
 
             player.on('timeupdate', handleTimeUpdate);
             player.on('seeking', handleSeeking);
@@ -119,17 +116,15 @@
             const episodeNameH2 = episodeNameOverlay.querySelector('h2');
             episodeNameH2.textContent = "{{ episode.name }}";
             console.log("Set episode name:", episodeNameOverlay.textContent);
-            // Ensure autoplay
+            
             player.ready(function() {
-            player.on('play', function() {
-                if (adPlaying) {
-                player.pause();
-            }
-                showEpisodeName();
-                setTimeout(hideEpisodeName, 3000);
-               
-                
-            });
+                player.on('play', function() {
+                    if (adPlaying) {
+                        player.pause();
+                    }
+                    showEpisodeName();
+                    setTimeout(hideEpisodeName, 3000);
+                });
             });
             player.on('pause', hideEpisodeName);
             player.el().addEventListener('mousemove', handleMouseMove);
@@ -163,7 +158,7 @@
                 hideEpisodeName();
             }, 2000);
         }
-        
+
         function showEpisodeName() {
             const episodeNameOverlay = document.getElementById('episode-name');
             episodeNameOverlay.style.opacity = '1';
@@ -173,7 +168,6 @@
             const episodeNameOverlay = document.getElementById('episode-name');
             episodeNameOverlay.style.opacity = '0';
         }
-        
 
         function loadIMASDK(callback) {
             const script = document.createElement('script');
@@ -185,7 +179,7 @@
                 processAdQueue();
             };
             script.onerror = () => {
-                // Implement fallback behavior or user notification
+                console.error("Failed to load IMA SDK");
             };
             document.head.appendChild(script);
         }
@@ -209,13 +203,34 @@
                 false);
         }
 
-        function requestAds() {
+        function getCurrentIP() {
+            return fetch('https://api.ipify.org?format=json')
+                .then(response => response.json())
+                .then(data => data.ip)
+                .catch(error => {
+                    console.error('Error fetching IP:', error);
+                    return '0.0.0.0'; // Default IP if fetch fails
+                });
+        }
+
+        async function requestAds() {
     if (!imaSDKLoaded) {
         adRequestQueue.push(true);
         return;
     }
 
-    const vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?site_id=49382&site_page=[SITE_PAGE]&format=vast&pod_duration=[POD_DURATION]&cb=[CACHEBUSTER]&ip=[IP]&ua=[UA]&player_height=[HEIGHT]&player_width=[WIDTH]&is_lat=[LIMITED_AD_TRACKING]&site_name=[CHANNEL_NAME]&content_cat=[CONTENT_CAT]&content_channel=[CONTENT_CHANNEL]&content_context=[CONTENT_CONTEXT]&content_dist_id=[CONTENT_DIST_ID]&content_dist_name=[CONTENT_DIST_NAME]&content_episode=[CONTENT_EPISODE]&content_genre=[CONTENT_GENRE]&content_id=[CONTENT_ID]&content_keywords=[CONTENT_KEYWORDS]&content_language=[CONTENT_LANGUAGE]&content_length=[CONTENT_LENGTH]&content_network=[CONTENT_NETWORK]&content_prodqual=[CONTENT_PROD]&content_producer_id=[CONTENT_PRODUCER_ID]&content_producer=[CONTENT_PRODUCER_NAME]&content_rating=[CONTENT_RATING]&content_season=[CONTENT_SEASON]&content_series=[CONTENT_SERIES]&content_title=[CONTENT_TITLE]&content_url=[CONTENT_URL]&buyeruid=[BUYERUID]&us_privacy=[US_PRIVACY]&consent=[CONSENT]&coppa=[COPPA]&custom_5=[CUSTOM_5]&custom_6=[CUSTOM_6]&custom_7=[CUSTOM_7]&custom_8=[CUSTOM_8]&custom_9=[CUSTOM_9]&custom_10=[CUSTOM_10]&custom_11=[CUSTOM_11]&custom_12=[CUSTOM_12]&custom_13=[CUSTOM_13]&custom_14=[CUSTOM_14]&custom_15=[CUSTOM_15]&custom_16=[CUSTOM_16]&custom_17=[CUSTOM_17]&custom_18=[CUSTOM_18]&device_language=[DEVICE_LANGUAGE]&lat=[LAT]&lon=[LON]&device_type=[DEVICE_TYPE]&gdpr=[GDPR]&gender=[GENDER]&genre_id=[GENRE_ID]&ifa_type=[IFA_TYPE]&iris_context=[IRIS_CONTEXT]&iris_id=[IRIS_ID]&livestream=[LIVESTREAM]&max_bitrate=[MAXBITRATE]&min_bitrate=[MINBITRATE]&partner_domain=[PARTNER_DOMAIN]&position=[POSITION]&preferred_language=[PREFERRED_LANGUAGE]&rights_holder=[RIGHTS_HOLDER]&ssai_enabled=[SSAI_ENABLED]&ssai_vendor=[SSAI_VENDOR]&session_id=[SESSION_ID]&schain=[SCHAIN]&yob=[YOB]';
+    const timestamp = Date.now();
+    const cacheBuster = timestamp + Math.random().toString(36).substring(2);
+    
+    // Wait for the IP to be fetched
+    const currentIP = await getCurrentIP();
+
+    let vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?site_id=49382&site_page=[SITE_PAGE]&format=vast&pod_duration=[POD_DURATION]&cb=[CACHEBUSTER]&ip=[IP]&ua=[UA]&player_height=[HEIGHT]&player_width=[WIDTH]&is_lat=[LIMITED_AD_TRACKING]&site_name=[CHANNEL_NAME]&content_cat=[CONTENT_CAT]&content_channel=[CONTENT_CHANNEL]&content_context=[CONTENT_CONTEXT]&content_dist_id=[CONTENT_DIST_ID]&content_dist_name=[CONTENT_DIST_NAME]&content_episode=[CONTENT_EPISODE]&content_genre=[CONTENT_GENRE]&content_id=[CONTENT_ID]&content_keywords=[CONTENT_KEYWORDS]&content_language=[CONTENT_LANGUAGE]&content_length=[CONTENT_LENGTH]&content_network=[CONTENT_NETWORK]&content_prodqual=[CONTENT_PROD]&content_producer_id=[CONTENT_PRODUCER_ID]&content_producer=[CONTENT_PRODUCER_NAME]&content_rating=[CONTENT_RATING]&content_season=[CONTENT_SEASON]&content_series=[CONTENT_SERIES]&content_title=[CONTENT_TITLE]&content_url=[CONTENT_URL]&buyeruid=[BUYERUID]&us_privacy=[US_PRIVACY]&consent=[CONSENT]&coppa=[COPPA]&custom_5=[CUSTOM_5]&custom_6=[CUSTOM_6]&custom_7=[CUSTOM_7]&custom_8=[CUSTOM_8]&custom_9=[CUSTOM_9]&custom_10=[CUSTOM_10]&custom_11=[CUSTOM_11]&custom_12=[CUSTOM_12]&custom_13=[CUSTOM_13]&custom_14=[CUSTOM_14]&custom_15=[CUSTOM_15]&custom_16=[CUSTOM_16]&custom_17=[CUSTOM_17]&custom_18=[CUSTOM_18]&device_language=[DEVICE_LANGUAGE]&lat=[LAT]&lon=[LON]&device_type=[DEVICE_TYPE]&gdpr=[GDPR]&gender=[GENDER]&genre_id=[GENRE_ID]&ifa_type=[IFA_TYPE]&iris_context=[IRIS_CONTEXT]&iris_id=[IRIS_ID]&livestream=[LIVESTREAM]&max_bitrate=[MAXBITRATE]&min_bitrate=[MINBITRATE]&partner_domain=[PARTNER_DOMAIN]&position=[POSITION]&preferred_language=[PREFERRED_LANGUAGE]&rights_holder=[RIGHTS_HOLDER]&ssai_enabled=[SSAI_ENABLED]&ssai_vendor=[SSAI_VENDOR]&session_id=[SESSION_ID]&schain=[SCHAIN]&yob=[YOB]&timestamp=[TIMESTAMP]';
+
+    vastUrl = vastUrl.replace('[CACHEBUSTER]', cacheBuster);
+    vastUrl = vastUrl.replace('[SESSION_ID]', sessionId);
+    vastUrl = vastUrl.replace('[IP]', currentIP);
+    vastUrl = vastUrl.replace('[TIMESTAMP]', timestamp);
 
     const adsRequest = new google.ima.AdsRequest();
     adsRequest.adTagUrl = vastUrl;
@@ -226,10 +241,6 @@
 
     adsLoader.requestAds(adsRequest);
 }
-
-
-        
-
 
 
         function processAdQueue() {
@@ -265,7 +276,7 @@
 
         function onContentPauseRequested() {
             player.pause();
-            player.tech_.el_.pause(); // Force pause on the underlying video element
+            player.tech_.el_.pause();
             player.muted(true);
             player.controls(false);
             player.el().style.pointerEvents = 'none';
@@ -286,6 +297,7 @@
             }
             player.play();
         }
+
         function onAdError(adErrorEvent) {
             if (adsManager) {
                 adsManager.destroy();
@@ -312,8 +324,6 @@
             });
         }
 
-        let savedTime;
-
         function handleSeeking() {
             const currentTime = player.currentTime();
             const bufferTime = 0.5;
@@ -325,11 +335,10 @@
             if (nextCuePoint && currentTime >= nextCuePoint.time - bufferTime && !adPlaying) {
                 player.pause();
                 adPlaying = true;
-                savedTime = currentTime; // Save the current time
+                savedTime = currentTime;
                 requestAds();
             }
         }
-
 
         window.addEventListener('resize', function() {
             if (adsManager) {
@@ -337,6 +346,12 @@
             }
         });
 
+        window.addEventListener('beforeunload', function() {
+            adRequestQueue.length = 0;
+            lastPlayedCuePoint = -1;
+            sessionId = generateSessionId();
+        });
+     
         initializePlayer();
     </script>
 </body>
