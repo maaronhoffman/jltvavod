@@ -114,13 +114,10 @@
     }
 
     player = videojs('my-video', { 
-        autoplay: 'any', 
+        autoplay: true, 
         muted: true,
         playsinline: true,
         controls: true,
-        fullscreen: {
-            enabled: false
-        } 
     });
             adContainer = document.getElementById('ad-container');
             adContainer.style.display = 'none';
