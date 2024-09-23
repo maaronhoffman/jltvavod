@@ -1,7 +1,8 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, redirect
 from app.models import Show, Episode, Season, CustomRow
 from app.utils import process_media_playlist
 import json
+import os
 
 bp = Blueprint('main', __name__)
 
@@ -62,3 +63,11 @@ def get_episodes(season_id):
 def show_detail(show_id):
     show = Show.query.get_or_404(show_id)
     return render_template('show_detail.html', show=show)
+
+@bp.route('/ads.txt')
+def ads_txt():
+    return redirect('https://adstxt.guru/hosting/EqzTPODF6Imv8za6tjmmGYWlWrfqzEHW/')
+
+@bp.route('/app-ads.txt')
+def app_ads_txt():
+    return redirect('https://adstxt.guru/hosting/EqzTPODF6Imv8za6tjmmGYWlWrfqzEHW/')
