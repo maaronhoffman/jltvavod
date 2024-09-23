@@ -266,7 +266,7 @@ async function getCurrentIP(useRandom = true) {
                 adRequestQueue.push(true);
                 return;
             }
-
+            player.pause();
             const timestamp = Date.now();
             const cacheBuster = timestamp + Math.random().toString(36).substring(2);
             
@@ -305,20 +305,21 @@ async function getCurrentIP(useRandom = true) {
         }
 
         function onAdsManagerLoaded(adsManagerLoadedEvent) {
-            adsManager = adsManagerLoadedEvent.getAdsManager(player.el());
-            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
-            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
-            adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError);
-            adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, onAllAdsCompleted);
-            adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdEnded);
+    adsManager = adsManagerLoadedEvent.getAdsManager(player.el());
+    adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
+    adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
+    adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError);
+    adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, onAllAdsCompleted);
+    adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdEnded);
 
-            try {
-                adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
-                adsManager.start();
-            } catch (adError) {
-                player.play();
-            }
-        }
+    try {
+        adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
+        adsManager.start();
+    } catch (adError) {
+        onAdError(adError);
+    }
+}
+
 
         function onAdEnded() {
             if (adPlayed) {
@@ -353,12 +354,15 @@ async function getCurrentIP(useRandom = true) {
         }
 
         function onAdError(adErrorEvent) {
-            if (adsManager) {
-                adsManager.destroy();
-            }
-            adPlaying = false;
-            player.play();
-        }
+    console.log('Ad error:', adErrorEvent.getError());
+    if (adsManager) {
+        adsManager.destroy();
+    }
+    adContainer.style.display = 'none';
+    adPlaying = false;
+    player.play();
+}
+
 
         function onAllAdsCompleted() {
             adPlaying = false;
