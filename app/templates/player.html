@@ -49,9 +49,7 @@
             -webkit-backdrop-filter: blur(10px);
             height: 60px !important;
         }
-        .vjs-icon-play:before {
-            content: url('/static/images/play.svg') !important;
-        }
+       
         .video-js .vjs-play-progress {
             background-color: #00a0ff;
         }
@@ -70,7 +68,24 @@
             margin-top: -12px;
             color: #ccc;
         }
+.video-js .vjs-big-play-button .vjs-icon-placeholder:before {
+    content: '' !important;
+    background-image: url('/static/images/play.svg');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    border: none !important;
+    width: 200px;
+    height: 200px;
+}
 
+.video-js .vjs-big-play-button {
+background-color: transparent;
+width: 200px;
+height: 200px;
+border-color: transparent;
+    
+}
         .video-js.vjs-has-autoplay .vjs-big-play-button {
             display: none !important;
         }
@@ -103,7 +118,6 @@
         let savedTime;
         let prerollRequested = false;
         let adDisplayContainerInitialized = false;
-        let adDisplayContainer;
 
         function generateSessionId() {
             return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -114,11 +128,12 @@
         }
 
         function initializePlayer() {
+            let isMobileDevice = isMobile();
+
             player = videojs('my-video', {
-                autoplay: true, // Do not autoplay
-                muted: true, // Do not mute
+                autoplay: !isMobileDevice, // On mobile devices, do not autoplay
+                muted: !isMobileDevice, // On mobile devices, do not mute
                 controls: true,
-                playsinline: true,
                 fullscreen: {
                     enabled: false
                 }
@@ -133,14 +148,23 @@
             sessionId = generateSessionId();
             adRequestQueue.length = 0;
 
+            player.on('timeupdate', handleTimeUpdate);
+            player.on('seeking', handleSeeking);
+
             loadIMASDK(initIMA);
+            const episodeNameOverlay = document.getElementById('episode-name');
+            const episodeNameH2 = episodeNameOverlay.querySelector('h2');
+            episodeNameH2.textContent = "{{ episode.name }}";
+            console.log("Set episode name:", episodeNameOverlay.textContent);
 
-            player.one('play', function() {
-                if (!adDisplayContainerInitialized) {
-                    adDisplayContainer.initialize();
-                    adDisplayContainerInitialized = true;
-
-                    // Check for preroll SCTE marker at time 0
+            player.ready(function() {
+                player.on('play', function() {
+                    if (!adDisplayContainerInitialized) {
+                        if (adDisplayContainer && adDisplayContainer.initialize) {
+                            adDisplayContainer.initialize();
+                            adDisplayContainerInitialized = true;
+                        }
+                    }
                     if (!prerollRequested && scteMarkers.length > 0 && scteMarkers[0].time === 0) {
                         prerollRequested = true;
                         adPlaying = true;
@@ -148,19 +172,13 @@
                         requestAds();
                         return;
                     }
-                }
-                showEpisodeName();
-                setTimeout(hideEpisodeName, 3000);
+                    if (adPlaying) {
+                        player.pause();
+                    }
+                    showEpisodeName();
+                    setTimeout(hideEpisodeName, 3000);
+                });
             });
-
-            player.on('timeupdate', handleTimeUpdate);
-            player.on('seeking', handleSeeking);
-
-            const episodeNameOverlay = document.getElementById('episode-name');
-            const episodeNameH2 = episodeNameOverlay.querySelector('h2');
-            episodeNameH2.textContent = "{{ episode.name }}";
-            console.log("Set episode name:", episodeNameOverlay.textContent);
-
             player.on('pause', hideEpisodeName);
             player.el().addEventListener('mousemove', handleMouseMove);
             player.el().addEventListener('mouseenter', handleMouseEnter);
@@ -225,7 +243,7 @@
             }
 
             adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
-            // Do not call adDisplayContainer.initialize() here; initialize on user interaction
+            // Do not call adDisplayContainer.initialize() here
 
             adsLoader = new google.ima.AdsLoader(adDisplayContainer);
             adsLoader.addEventListener(
@@ -261,7 +279,6 @@
 
             if (!adDisplayContainerInitialized) {
                 console.warn("AdDisplayContainer not initialized yet");
-                adRequestQueue.push(true);
                 return;
             }
 
@@ -311,7 +328,6 @@
                 adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
                 adsManager.start();
             } catch (adError) {
-                console.error('AdsManager could not be started');
                 player.play();
             }
         }
@@ -326,6 +342,7 @@
 
         function onContentPauseRequested() {
             player.pause();
+            player.tech_.el_.pause();
             player.muted(true);
             player.controls(false);
             player.el().style.pointerEvents = 'none';
@@ -348,7 +365,6 @@
         }
 
         function onAdError(adErrorEvent) {
-            console.error('Ad Error:', adErrorEvent.getError());
             if (adsManager) {
                 adsManager.destroy();
             }
@@ -363,15 +379,14 @@
         }
 
         function handleTimeUpdate() {
-            if (adPlaying || !adDisplayContainerInitialized) {
+            if (adPlaying) {
                 return;
             }
             const currentTime = player.currentTime();
             scteMarkers.forEach((marker, index) => {
-                if (currentTime >= marker.time && index > lastPlayedCuePoint) {
+                if (currentTime >= marker.time && index > lastPlayedCuePoint && !adPlaying) {
                     adPlaying = true;
                     lastPlayedCuePoint = index;
-                    savedTime = currentTime;
                     player.pause();
                     requestAds();
                 }
@@ -386,10 +401,10 @@
             lastPlayedCuePoint = Math.max(-1, Math.min(lastPlayedCuePoint, scteMarkers.length - 1));
 
             const nextCuePoint = scteMarkers[lastPlayedCuePoint + 1];
-            if (nextCuePoint && currentTime >= nextCuePoint.time - bufferTime && !adPlaying && adDisplayContainerInitialized) {
+            if (nextCuePoint && currentTime >= nextCuePoint.time - bufferTime && !adPlaying) {
+                player.pause();
                 adPlaying = true;
                 savedTime = currentTime;
-                player.pause();
                 requestAds();
             }
         }

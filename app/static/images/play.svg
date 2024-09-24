@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 444.78 112.44">
+  <defs>
+    <style>
+      .cls-1 {
+        letter-spacing: -.05em;
+      }
+
+      .cls-2 {
+        letter-spacing: .02em;
+      }
+
+      .cls-3 {
+        fill: #fff;
+        font-family: Aileron-Regular, Aileron;
+        font-size: 49.57px;
+      }
+
+      .cls-4 {
+        letter-spacing: -.01em;
+      }
+
+      .cls-5 {
+        letter-spacing: -.01em;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <text class="cls-3" transform="translate(22.06 41.89)"><tspan x="0" y="0">Please </tspan><tspan class="cls-1" x="156.11" y="0">T</tspan><tspan x="184.17" y="0">ap </tspan><tspan class="cls-4" x="251.49" y="0">t</tspan><tspan x="266.36" y="0">o P</tspan><tspan class="cls-2" x="335.76" y="0">l</tspan><tspan x="348.9" y="0">ay</tspan><tspan x="-22.06" y="59.49">On Mobile B</tspan><tspan class="cls-5" x="249.9" y="59.49">r</tspan><tspan x="265.66" y="59.49">owsers</tspan></text>
+  </g>
+</svg>
