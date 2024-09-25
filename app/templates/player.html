@@ -9,8 +9,6 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <link href="https://vjs.zencdn.net/7.10.2/video-js.min.css" rel="stylesheet">
     <script src="https://vjs.zencdn.net/7.10.2/video.min.js"></script>
-    <!-- IMA SDK -->
-    <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
     <!-- Custom styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
@@ -68,24 +66,46 @@
             margin-top: -12px;
             color: #ccc;
         }
-.video-js .vjs-big-play-button .vjs-icon-placeholder:before {
-    content: '' !important;
-    background-image: url('/static/images/play.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    border: none !important;
-    width: 200px;
-    height: 200px;
-}
+        
+        .video-js .vjs-big-play-button .vjs-icon-placeholder:before {
+            content: '' !important;
+            background-image: url('/static/images/play.svg');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            border: none !important;
+            width: 200px;
+            height: 200px;
+        }
 
-.video-js .vjs-big-play-button {
-background-color: transparent;
-width: 200px;
-height: 200px;
-border-color: transparent;
-    
-}
+        .video-js .vjs-big-play-button {
+        background-color: transparent;
+        width: 200px;
+        height: 200px;
+        border-color: transparent;
+            
+        }
+
+        #ad-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        @media screen and (min-width: 768px) {
+            .video-js .vjs-big-play-button {
+        display: none;
+            
+        }
+        }
+
+        .video-js .vjs-big-play-button:hover {
+        display: none;
+            
+        }
         .video-js.vjs-has-autoplay .vjs-big-play-button {
             display: none !important;
         }
@@ -108,7 +128,7 @@ border-color: transparent;
 
     <script>
         const IMA_SDK_URL = 'https://imasdk.googleapis.com/js/sdkloader/ima3.js';
-        const MAX_RETRIES = 3;
+        const MAX_RETRIES = 3; // Maximum number of retries
         let adPlayed = false;
         let player, adContainer, adPlaying, scteMarkers, adsManager, adsLoader, lastPlayedCuePoint;
         let imaSDKLoaded = false;
@@ -118,6 +138,7 @@ border-color: transparent;
         let savedTime;
         let prerollRequested = false;
         let adDisplayContainerInitialized = false;
+        let retryCount = 0; // Initialize retry counter
 
         function generateSessionId() {
             return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -240,11 +261,12 @@ border-color: transparent;
 
         function initIMA() {
             if (typeof google === 'undefined' || typeof google.ima === 'undefined') {
+                console.error("Google IMA SDK not loaded properly.");
                 return;
             }
 
             adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
-            // Do not call adDisplayContainer.initialize() here
+            adDisplayContainer.initialize(); // Initialize immediately
 
             adsLoader = new google.ima.AdsLoader(adDisplayContainer);
             adsLoader.addEventListener(
@@ -257,19 +279,23 @@ border-color: transparent;
                 false);
         }
 
-        function getRandomIP() {
-            const usRanges = [
-                [172, 16, 0, 0],
+        function getRandomPublicIP() {
+            const firstOctet = Math.floor(Math.random() * (223 - 1)) + 1; // 1-223
+            const octets = [
+                firstOctet,
+                Math.floor(Math.random() * 256),
+                Math.floor(Math.random() * 256),
+                Math.floor(Math.random() * 256)
             ];
-            const range = usRanges[Math.floor(Math.random() * usRanges.length)];
-            return range.map((num, index) => {
-                if (index === 0) return num;
-                return Math.floor(Math.random() * 256);
-            }).join('.');
+            return octets.join('.');
         }
 
         async function getCurrentIP(useRandom = true) {
-            return getRandomIP();
+            if (useRandom) {
+                return getRandomPublicIP();
+            }
+            // Implement actual IP fetching logic if needed
+            return '0.0.0.0';
         }
 
         async function requestAds() {
@@ -288,17 +314,35 @@ border-color: transparent;
 
             const currentIP = await getCurrentIP(true);
 
-            let vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?site_id=49382&site_page=[SITE_PAGE]&format=vast&pod_duration=[POD_DURATION]&cb=[CACHEBUSTER]&ip=[IP]&ua=[UA]&player_height=[HEIGHT]&player_width=[WIDTH]&is_lat=[LIMITED_AD_TRACKING]&site_name=[CHANNEL_NAME]&content_cat=[CONTENT_CAT]&content_channel=[CONTENT_CHANNEL]&content_context=[CONTENT_CONTEXT]&content_dist_id=[CONTENT_DIST_ID]&content_dist_name=[CONTENT_DIST_NAME]&content_episode=[CONTENT_EPISODE]&content_genre=[CONTENT_GENRE]&content_id=[CONTENT_ID]&content_keywords=[CONTENT_KEYWORDS]&content_language=[CONTENT_LANGUAGE]&content_length=[CONTENT_LENGTH]&content_network=[CONTENT_NETWORK]&content_prodqual=[CONTENT_PROD]&content_producer_id=[CONTENT_PRODUCER_ID]&content_producer=[CONTENT_PRODUCER_NAME]&content_rating=[CONTENT_RATING]&content_season=[CONTENT_SEASON]&content_series=[CONTENT_SERIES]&content_title=[CONTENT_TITLE]&content_url=[CONTENT_URL]&buyeruid=[BUYERUID]&us_privacy=[US_PRIVACY]&consent=[CONSENT]&coppa=[COPPA]&custom_5=[CUSTOM_5]&custom_6=[CUSTOM_6]&custom_7=[CUSTOM_7]&custom_8=[CUSTOM_8]&custom_9=[CUSTOM_9]&custom_10=[CUSTOM_10]&custom_11=[CUSTOM_11]&custom_12=[CUSTOM_12]&custom_13=[CUSTOM_13]&custom_14=[CUSTOM_14]&custom_15=[CUSTOM_15]&custom_16=[CUSTOM_16]&custom_17=[CUSTOM_17]&custom_18=[CUSTOM_18]&device_language=[DEVICE_LANGUAGE]&lat=[LAT]&lon=[LON]&device_type=[DEVICE_TYPE]&gdpr=[GDPR]&gender=[GENDER]&genre_id=[GENRE_ID]&ifa_type=[IFA_TYPE]&iris_context=[IRIS_CONTEXT]&iris_id=[IRIS_ID]&livestream=[LIVESTREAM]&max_bitrate=[MAXBITRATE]&min_bitrate=[MINBITRATE]&partner_domain=[PARTNER_DOMAIN]&position=[POSITION]&preferred_language=[PREFERRED_LANGUAGE]&rights_holder=[RIGHTS_HOLDER]&ssai_enabled=[SSAI_ENABLED]&ssai_vendor=[SSAI_VENDOR]&session_id=[SESSION_ID]&schain=[SCHAIN]&yob=[YOB]&timestamp=[TIMESTAMP]';
+            const episodeName = "{{ episode.name }}";
+            const showName = "{{ show.name }}";
 
-            vastUrl = vastUrl.replace('[CACHEBUSTER]', cacheBuster);
-            vastUrl = vastUrl.replace('[SESSION_ID]', sessionId);
-            vastUrl = vastUrl.replace('[IP]', currentIP);
-            vastUrl = vastUrl.replace('[TIMESTAMP]', timestamp);
-            vastUrl = vastUrl.replace('[UA]', navigator.userAgent);
-            vastUrl = vastUrl.replace('[HEIGHT]', player.el().offsetHeight);
-            vastUrl = vastUrl.replace('[WIDTH]', player.el().offsetWidth);
-            vastUrl = vastUrl.replace('[LIMITED_AD_TRACKING]', 'false');
-            vastUrl = vastUrl.replace('[SITE_PAGE]', '{{ episode.name }}');
+            // Build a params object
+            const vastParams = {
+                site_id: '49382',
+                site_page: episodeName,
+                format: 'vast',
+                pod_duration: '60', // Assuming 0
+                cb: cacheBuster,
+                ip: currentIP,
+                ua: navigator.userAgent,
+                player_height: player.el().offsetHeight,
+                player_width: player.el().offsetWidth,
+                is_lat: 'false',
+                site_name: 'JLTV',
+                session_id: sessionId,
+                timestamp: timestamp,
+                content_title: episodeName,
+                content_series: showName,
+                content_length: Math.floor(player.duration()) || 0,
+                content_language: 'en',
+                
+            };
+
+            // Build the vastUrl
+            let vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?' + Object.keys(vastParams)
+                .map(key => key + '=' + encodeURIComponent(vastParams[key]))
+                .join('&');
 
             const adsRequest = new google.ima.AdsRequest();
             adsRequest.adTagUrl = vastUrl;
@@ -329,7 +373,8 @@ border-color: transparent;
                 adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
                 adsManager.start();
             } catch (adError) {
-                player.play();
+                console.error('AdsManager could not be started:', adError);
+                onAdError(); // Call onAdError to handle retry logic
             }
         }
 
@@ -339,12 +384,11 @@ border-color: transparent;
             }
             player.el().style.pointerEvents = 'auto';
             player.controls(true);
+            retryCount = 0; // Reset retry count after a successful ad play
         }
 
         function onContentPauseRequested() {
             player.pause();
-            player.tech_.el_.pause();
-            player.muted(true);
             player.controls(false);
             player.el().style.pointerEvents = 'none';
             adContainer.style.display = 'block';
@@ -366,17 +410,31 @@ border-color: transparent;
         }
 
         function onAdError(adErrorEvent) {
+            if (adErrorEvent) {
+                console.error('Ad error:', adErrorEvent.getError());
+            }
+
             if (adsManager) {
                 adsManager.destroy();
             }
-            adPlaying = false;
-            player.play();
+
+            if (retryCount < MAX_RETRIES) {
+                retryCount++;
+                console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
+                requestAds();
+            } else {
+                console.error('Max ad retries reached. Proceeding without ads.');
+                adPlaying = false;
+                retryCount = 0; // Reset retry count
+                player.play();
+            }
         }
 
         function onAllAdsCompleted() {
             adPlaying = false;
             player.removeClass('vjs-controls-hidden');
             player.play();
+            retryCount = 0; // Reset retry count after ads complete
         }
 
         function handleTimeUpdate() {
