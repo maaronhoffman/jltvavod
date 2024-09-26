@@ -171,6 +171,11 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* New CSS to hide the big play button on mobile when playing */
+        .hide-big-play-button .vjs-big-play-button {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -208,6 +213,7 @@
         let adDisplayContainerInitialized = false;
         let retryCount = 0; // Initialize retry counter
         let adDisplayContainer;
+        let adRequestInProgress = false; // Flag to prevent multiple ad requests
 
         function generateSessionId() {
             return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -247,6 +253,7 @@
             prerollRequested = false;
             savedTime = undefined;
             retryCount = 0;
+            adRequestInProgress = false; // Reset the ad request flag
 
             player.on('timeupdate', handleTimeUpdate);
             player.on('seeking', handleSeeking);
@@ -291,6 +298,16 @@
             player.el().addEventListener('touchstart', handleTouch);
             player.el().addEventListener('touchmove', handleTouch);
             player.el().addEventListener('touchend', handleTouch);
+
+            // Hide the big play button on mobile devices when play starts
+            if (isMobileDevice) {
+                player.on('play', function() {
+                    const videoContainer = document.getElementById('video-container');
+                    if (videoContainer) {
+                        videoContainer.classList.add('hide-big-play-button');
+                    }
+                });
+            }
         }
         // Function to dispose of the player
         function disposePlayer() {
@@ -435,153 +452,160 @@
         }
 
         function customEncode(str) {
-        return encodeURIComponent(str)
-            .replace(/%5B/g, '[')
-            .replace(/%5D/g, ']');
-    }
-
-    async function requestAds() {
-        if (!imaSDKLoaded) {
-            adRequestQueue.push(true);
-            return;
+            return encodeURIComponent(str)
+                .replace(/%5B/g, '[')
+                .replace(/%5D/g, ']');
         }
 
-        if (!adDisplayContainerInitialized) {
-            console.warn("AdDisplayContainer not initialized yet");
-            return;
+        async function requestAds() {
+            if (adRequestInProgress) {
+                console.warn("Ad request already in progress. Skipping duplicate request.");
+                return;
+            }
+
+            if (!imaSDKLoaded) {
+                adRequestQueue.push(true);
+                return;
+            }
+
+            if (!adDisplayContainerInitialized) {
+                console.warn("AdDisplayContainer not initialized yet");
+                return;
+            }
+
+            adRequestInProgress = true; // Set the flag to indicate ad request is in progress
+
+            const timestamp = Date.now();
+            const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
+
+            const currentIP = await getCurrentIP(false); // Changed to false as per user request
+
+            // Gather additional dynamic data
+            const episodeName = "{{ episode.name }}";
+            const showName = "{{ show.name }}";
+            const episodeId = "{{ episode.id }}"; // Assuming you have an episode ID
+            const showId = "{{ show.id }}"; // Assuming you have a show ID
+            const referrer = document.referrer || 'direct';
+            const pageURL = window.location.href;
+            const contentGenre = "{{ episode.genre }}"; // Assuming genre is available
+            const userAgent = navigator.userAgent;
+            const language = navigator.language || 'en';
+
+            // Device Information
+            const screenWidth = window.screen.width;
+            const screenHeight = window.screen.height;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const deviceType = isMobile() ? 'mobile' : 'desktop';
+            const os = getOS(); // Function to determine OS
+            const browser = getBrowser(); // Function to determine browser
+            const sitePage = window.location.href;
+            // Content Length in seconds
+            const contentLength = Math.floor(player.duration()) || 0;
+
+            // Define the parameters in order
+            const parameters = [
+                { name: 'site_id', placeholder: '49382', value: '49382' },
+                { name: 'site_page', placeholder: '[SITE_PAGE]', value: sitePage },
+                { name: 'format', placeholder: 'vast', value: 'vast' },
+                { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '60' },
+                { name: 'cb', placeholder: '[CACHEBUSTER]', value: cacheBuster },
+                { name: 'ip', placeholder: '[IP]', value: currentIP },
+                { name: 'ua', placeholder: '[UA]', value: userAgent },
+                { name: 'player_height', placeholder: '[HEIGHT]', value: player.el().offsetHeight },
+                { name: 'player_width', placeholder: '[WIDTH]', value: player.el().offsetWidth },
+                { name: 'is_lat', placeholder: '[LIMITED_AD_TRACKING]', value: 'false' },
+                { name: 'site_name', placeholder: '[CHANNEL_NAME]', value: 'JLTV' },
+                { name: 'content_cat', placeholder: '[CONTENT_CAT]', value: 'Faith' },
+                { name: 'content_channel', placeholder: '[CONTENT_CHANNEL]', value: undefined },
+                { name: 'content_context', placeholder: '[CONTENT_CONTEXT]', value: undefined },
+                { name: 'content_dist_id', placeholder: '[CONTENT_DIST_ID]', value: undefined },
+                { name: 'content_dist_name', placeholder: '[CONTENT_DIST_NAME]', value: undefined },
+                { name: 'content_episode', placeholder: '[CONTENT_EPISODE]', value: undefined },
+                { name: 'content_genre', placeholder: '[CONTENT_GENRE]', value: contentGenre },
+                { name: 'content_id', placeholder: '[CONTENT_ID]', value: episodeId },
+                { name: 'content_keywords', placeholder: '[CONTENT_KEYWORDS]', value: undefined },
+                { name: 'content_language', placeholder: '[CONTENT_LANGUAGE]', value: language },
+                { name: 'content_length', placeholder: '[CONTENT_LENGTH]', value: contentLength },
+                { name: 'content_network', placeholder: '[CONTENT_NETWORK]', value: undefined },
+                { name: 'content_prodqual', placeholder: '[CONTENT_PROD]', value: undefined },
+                { name: 'content_producer_id', placeholder: '[CONTENT_PRODUCER_ID]', value: undefined },
+                { name: 'content_producer', placeholder: '[CONTENT_PRODUCER_NAME]', value: undefined },
+                { name: 'content_rating', placeholder: '[CONTENT_RATING]', value: undefined },
+                { name: 'content_season', placeholder: '[CONTENT_SEASON]', value: undefined },
+                { name: 'content_series', placeholder: '[CONTENT_SERIES]', value: showName },
+                { name: 'content_title', placeholder: '[CONTENT_TITLE]', value: episodeName },
+                { name: 'content_url', placeholder: '[CONTENT_URL]', value: undefined },
+                { name: 'buyeruid', placeholder: '[BUYERUID]', value: undefined },
+                { name: 'us_privacy', placeholder: '[US_PRIVACY]', value: undefined },
+                { name: 'consent', placeholder: '[CONSENT]', value: undefined },
+                { name: 'coppa', placeholder: '[COPPA]', value: undefined },
+                { name: 'custom_5', placeholder: '[CUSTOM_5]', value: undefined },
+                { name: 'custom_6', placeholder: '[CUSTOM_6]', value: undefined },
+                { name: 'custom_7', placeholder: '[CUSTOM_7]', value: undefined },
+                { name: 'custom_8', placeholder: '[CUSTOM_8]', value: undefined },
+                { name: 'custom_9', placeholder: '[CUSTOM_9]', value: undefined },
+                { name: 'custom_10', placeholder: '[CUSTOM_10]', value: undefined },
+                { name: 'custom_11', placeholder: '[CUSTOM_11]', value: undefined },
+                { name: 'custom_12', placeholder: '[CUSTOM_12]', value: undefined },
+                { name: 'custom_13', placeholder: '[CUSTOM_13]', value: undefined },
+                { name: 'custom_14', placeholder: '[CUSTOM_14]', value: undefined },
+                { name: 'custom_15', placeholder: '[CUSTOM_15]', value: undefined },
+                { name: 'custom_16', placeholder: '[CUSTOM_16]', value: undefined },
+                { name: 'custom_17', placeholder: '[CUSTOM_17]', value: undefined },
+                { name: 'custom_18', placeholder: '[CUSTOM_18]', value: undefined },
+                { name: 'device_language', placeholder: '[DEVICE_LANGUAGE]', value: undefined },
+                { name: 'lat', placeholder: '[LAT]', value: undefined },
+                { name: 'lon', placeholder: '[LON]', value: undefined },
+                { name: 'device_type', placeholder: '[DEVICE_TYPE]', value: deviceType },
+                { name: 'gdpr', placeholder: '[GDPR]', value: undefined },
+                { name: 'gender', placeholder: '[GENDER]', value: undefined },
+                { name: 'genre_id', placeholder: '[GENRE_ID]', value: undefined },
+                { name: 'ifa_type', placeholder: '[IFA_TYPE]', value: undefined },
+                { name: 'iris_context', placeholder: '[IRIS_CONTEXT]', value: undefined },
+                { name: 'iris_id', placeholder: '[IRIS_ID]', value: undefined },
+                { name: 'livestream', placeholder: '[LIVESTREAM]', value: undefined },
+                { name: 'max_bitrate', placeholder: '[MAXBITRATE]', value: undefined },
+                { name: 'min_bitrate', placeholder: '[MINBITRATE]', value: undefined },
+                { name: 'partner_domain', placeholder: '[PARTNER_DOMAIN]', value: undefined },
+                { name: 'position', placeholder: '[POSITION]', value: undefined },
+                { name: 'preferred_language', placeholder: '[PREFERRED_LANGUAGE]', value: undefined },
+                { name: 'rights_holder', placeholder: '[RIGHTS_HOLDER]', value: undefined },
+                { name: 'ssai_enabled', placeholder: '[SSAI_ENABLED]', value: undefined },
+                { name: 'ssai_vendor', placeholder: '[SSAI_VENDOR]', value: undefined },
+                { name: 'session_id', placeholder: '[SESSION_ID]', value: sessionId },
+                { name: 'schain', placeholder: '[SCHAIN]', value: undefined },
+                { name: 'yob', placeholder: '[YOB]', value: undefined },
+            ];
+
+            // Build the VAST URL
+            let vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?';
+
+            // Build the query string with custom encoding
+            const queryParams = parameters.map(param => {
+                const value = (param.value !== undefined && param.value !== null) ? param.value : param.placeholder;
+                const encodedName = encodeURIComponent(param.name);
+                const encodedValue = customEncode(value);
+                return `${encodedName}=${encodedValue}`;
+            });
+
+            vastUrl += queryParams.join('&');
+
+            console.log("VAST URL:", vastUrl); // For debugging purposes
+
+            // Configure the AdsRequest
+            const adsRequest = new google.ima.AdsRequest();
+            adsRequest.adTagUrl = vastUrl;
+
+            // Set ad slot sizes
+            adsRequest.linearAdSlotWidth = player.el().offsetWidth;
+            adsRequest.linearAdSlotHeight = player.el().offsetHeight;
+            adsRequest.nonLinearAdSlotWidth = player.el().offsetWidth;
+            adsRequest.nonLinearAdSlotHeight = player.el().offsetHeight;
+
+            // Make the ad request
+            adsLoader.requestAds(adsRequest);
         }
-
-        const timestamp = Date.now();
-        const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
-
-        const currentIP = await getCurrentIP(false); // Changed to false as per user request
-
-        // Gather additional dynamic data
-        const episodeName = "{{ episode.name }}";
-        const showName = "{{ show.name }}";
-        const episodeId = "{{ episode.id }}"; // Assuming you have an episode ID
-        const showId = "{{ show.id }}"; // Assuming you have a show ID
-        const referrer = document.referrer || 'direct';
-        const pageURL = window.location.href;
-        const contentGenre = "{{ episode.genre }}"; // Assuming genre is available
-        const userAgent = navigator.userAgent;
-        const language = navigator.language || 'en';
-
-        // Device Information
-        const screenWidth = window.screen.width;
-        const screenHeight = window.screen.height;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const deviceType = isMobile() ? 'mobile' : 'desktop';
-        const os = getOS(); // Function to determine OS
-        const browser = getBrowser(); // Function to determine browser
-        const sitePage = window.location.href;
-        // Content Length in seconds
-        const contentLength = Math.floor(player.duration()) || 0;
-
-        // Define the parameters in order
-        const parameters = [
-            { name: 'site_id', placeholder: '49382', value: '49382' },
-            { name: 'site_page', placeholder: '[SITE_PAGE]', value: sitePage },
-            { name: 'format', placeholder: 'vast', value: 'vast' },
-            { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '60' },
-            { name: 'cb', placeholder: '[CACHEBUSTER]', value: cacheBuster },
-            { name: 'ip', placeholder: '[IP]', value: currentIP },
-            { name: 'ua', placeholder: '[UA]', value: userAgent },
-            { name: 'player_height', placeholder: '[HEIGHT]', value: player.el().offsetHeight },
-            { name: 'player_width', placeholder: '[WIDTH]', value: player.el().offsetWidth },
-            { name: 'is_lat', placeholder: '[LIMITED_AD_TRACKING]', value: 'false' },
-            { name: 'site_name', placeholder: '[CHANNEL_NAME]', value: 'JLTV' },
-            { name: 'content_cat', placeholder: '[CONTENT_CAT]', value: undefined },
-            { name: 'content_channel', placeholder: '[CONTENT_CHANNEL]', value: undefined },
-            { name: 'content_context', placeholder: '[CONTENT_CONTEXT]', value: undefined },
-            { name: 'content_dist_id', placeholder: '[CONTENT_DIST_ID]', value: undefined },
-            { name: 'content_dist_name', placeholder: '[CONTENT_DIST_NAME]', value: undefined },
-            { name: 'content_episode', placeholder: '[CONTENT_EPISODE]', value: undefined },
-            { name: 'content_genre', placeholder: '[CONTENT_GENRE]', value: contentGenre },
-            { name: 'content_id', placeholder: '[CONTENT_ID]', value: episodeId },
-            { name: 'content_keywords', placeholder: '[CONTENT_KEYWORDS]', value: undefined },
-            { name: 'content_language', placeholder: '[CONTENT_LANGUAGE]', value: language },
-            { name: 'content_length', placeholder: '[CONTENT_LENGTH]', value: contentLength },
-            { name: 'content_network', placeholder: '[CONTENT_NETWORK]', value: undefined },
-            { name: 'content_prodqual', placeholder: '[CONTENT_PROD]', value: undefined },
-            { name: 'content_producer_id', placeholder: '[CONTENT_PRODUCER_ID]', value: undefined },
-            { name: 'content_producer', placeholder: '[CONTENT_PRODUCER_NAME]', value: undefined },
-            { name: 'content_rating', placeholder: '[CONTENT_RATING]', value: undefined },
-            { name: 'content_season', placeholder: '[CONTENT_SEASON]', value: undefined },
-            { name: 'content_series', placeholder: '[CONTENT_SERIES]', value: showName },
-            { name: 'content_title', placeholder: '[CONTENT_TITLE]', value: episodeName },
-            { name: 'content_url', placeholder: '[CONTENT_URL]', value: undefined },
-            { name: 'buyeruid', placeholder: '[BUYERUID]', value: undefined },
-            { name: 'us_privacy', placeholder: '[US_PRIVACY]', value: undefined },
-            { name: 'consent', placeholder: '[CONSENT]', value: undefined },
-            { name: 'coppa', placeholder: '[COPPA]', value: undefined },
-            { name: 'custom_5', placeholder: '[CUSTOM_5]', value: undefined },
-            { name: 'custom_6', placeholder: '[CUSTOM_6]', value: undefined },
-            { name: 'custom_7', placeholder: '[CUSTOM_7]', value: undefined },
-            { name: 'custom_8', placeholder: '[CUSTOM_8]', value: undefined },
-            { name: 'custom_9', placeholder: '[CUSTOM_9]', value: undefined },
-            { name: 'custom_10', placeholder: '[CUSTOM_10]', value: undefined },
-            { name: 'custom_11', placeholder: '[CUSTOM_11]', value: undefined },
-            { name: 'custom_12', placeholder: '[CUSTOM_12]', value: undefined },
-            { name: 'custom_13', placeholder: '[CUSTOM_13]', value: undefined },
-            { name: 'custom_14', placeholder: '[CUSTOM_14]', value: undefined },
-            { name: 'custom_15', placeholder: '[CUSTOM_15]', value: undefined },
-            { name: 'custom_16', placeholder: '[CUSTOM_16]', value: undefined },
-            { name: 'custom_17', placeholder: '[CUSTOM_17]', value: undefined },
-            { name: 'custom_18', placeholder: '[CUSTOM_18]', value: undefined },
-            { name: 'device_language', placeholder: '[DEVICE_LANGUAGE]', value: undefined },
-            { name: 'lat', placeholder: '[LAT]', value: undefined },
-            { name: 'lon', placeholder: '[LON]', value: undefined },
-            { name: 'device_type', placeholder: '[DEVICE_TYPE]', value: deviceType },
-            { name: 'gdpr', placeholder: '[GDPR]', value: undefined },
-            { name: 'gender', placeholder: '[GENDER]', value: undefined },
-            { name: 'genre_id', placeholder: '[GENRE_ID]', value: undefined },
-            { name: 'ifa_type', placeholder: '[IFA_TYPE]', value: undefined },
-            { name: 'iris_context', placeholder: '[IRIS_CONTEXT]', value: undefined },
-            { name: 'iris_id', placeholder: '[IRIS_ID]', value: undefined },
-            { name: 'livestream', placeholder: '[LIVESTREAM]', value: undefined },
-            { name: 'max_bitrate', placeholder: '[MAXBITRATE]', value: undefined },
-            { name: 'min_bitrate', placeholder: '[MINBITRATE]', value: undefined },
-            { name: 'partner_domain', placeholder: '[PARTNER_DOMAIN]', value: undefined },
-            { name: 'position', placeholder: '[POSITION]', value: undefined },
-            { name: 'preferred_language', placeholder: '[PREFERRED_LANGUAGE]', value: undefined },
-            { name: 'rights_holder', placeholder: '[RIGHTS_HOLDER]', value: undefined },
-            { name: 'ssai_enabled', placeholder: '[SSAI_ENABLED]', value: undefined },
-            { name: 'ssai_vendor', placeholder: '[SSAI_VENDOR]', value: undefined },
-            { name: 'session_id', placeholder: '[SESSION_ID]', value: sessionId },
-            { name: 'schain', placeholder: '[SCHAIN]', value: undefined },
-            { name: 'yob', placeholder: '[YOB]', value: undefined },
-        ];
-
-        // Build the VAST URL
-        let vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?';
-
-        // Build the query string with custom encoding
-        const queryParams = parameters.map(param => {
-            const value = (param.value !== undefined && param.value !== null) ? param.value : param.placeholder;
-            const encodedName = encodeURIComponent(param.name);
-            const encodedValue = customEncode(value);
-            return `${encodedName}=${encodedValue}`;
-        });
-
-        vastUrl += queryParams.join('&');
-
-        console.log("VAST URL:", vastUrl); // For debugging purposes
-
-        // Configure the AdsRequest
-        const adsRequest = new google.ima.AdsRequest();
-        adsRequest.adTagUrl = vastUrl;
-
-        // Set ad slot sizes
-        adsRequest.linearAdSlotWidth = player.el().offsetWidth;
-        adsRequest.linearAdSlotHeight = player.el().offsetHeight;
-        adsRequest.nonLinearAdSlotWidth = player.el().offsetWidth;
-        adsRequest.nonLinearAdSlotHeight = player.el().offsetHeight;
-
-        // Make the ad request
-        adsLoader.requestAds(adsRequest);
-    }
 
         // Utility function to determine Operating System
         function getOS() {
@@ -661,6 +685,7 @@
             player.controls(true);
             hideSpinner(); // Hide spinner when ad ends
             retryCount = 0; // Reset retry count after a successful ad play
+            adRequestInProgress = false; // Reset the ad request flag
         }
 
         function onContentPauseRequested() {
@@ -699,13 +724,20 @@
             if (retryCount < MAX_RETRIES) {
                 retryCount++;
                 console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
-                showSpinner(); // Show spinner when retrying
-                requestAds();
+                hideSpinner(); // Hide spinner before retrying to prevent overlapping spinners
+                adRequestInProgress = false; // Reset the ad request flag to allow retry
+
+                // Implementing a delay before retrying (optional but recommended)
+                setTimeout(() => {
+                    showSpinner(); // Show spinner when retrying
+                    requestAds();
+                }, 0); // Exponential backoff: 1s, 2s, 3s, etc.
             } else {
                 console.error('Max ad retries reached. Proceeding without ads.');
                 adPlaying = false;
                 hideSpinner(); // Hide spinner when max retries reached
                 retryCount = 0; // Reset retry count
+                adRequestInProgress = false; // Reset the ad request flag
                 player.play();
             }
         }
@@ -716,6 +748,7 @@
             player.play();
             hideSpinner(); // Hide spinner when all ads are completed
             retryCount = 0; // Reset retry count after ads complete
+            adRequestInProgress = false; // Reset the ad request flag
         }
 
         function handleTimeUpdate() {
@@ -724,7 +757,8 @@
             }
             const currentTime = player.currentTime();
             scteMarkers.forEach((marker, index) => {
-                if (currentTime >= marker.time && index > lastPlayedCuePoint && !adPlaying) {
+                // Exclude markers at time=0 to prevent duplicate preroll ads
+                if (marker.time > 0 && currentTime >= marker.time && index > lastPlayedCuePoint && !adPlaying) {
                     adPlaying = true;
                     lastPlayedCuePoint = index;
                     player.pause();
@@ -768,9 +802,9 @@
         });
 
         function handleTouch() {
-    showEpisodeName();
-    resetMouseTimer();
-}
+            showEpisodeName();
+            resetMouseTimer();
+        }
 
         function showSpinner() {
             const spinner = document.getElementById('spinner');
