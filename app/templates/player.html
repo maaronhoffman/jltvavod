@@ -20,6 +20,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
+            background-color: black; /* Ensure background is black to match video */
         }
         #video-container {
             position: absolute;
@@ -160,7 +161,7 @@
 
         .spinner {
             border: 5px solid rgba(255, 255, 255, 0.3); /* Light grey with transparency */
-            border-top: 5px solid rgb(15, 169, 231); /* White border-top */
+            border-top: 5px solid rgb(15, 169, 231); /* Blue border-top */
             border-radius: 50%;
             width: 50px; /* Match Video.js spinner size */
             height: 50px; /* Match Video.js spinner size */
@@ -176,11 +177,16 @@
         .hide-big-play-button .vjs-big-play-button {
             display: none !important;
         }
+
+        /* Fullscreen Styles */
+        .vjs-fullscreen .show-info-header {
+            /* Adjust positioning or styles if needed when in fullscreen */
+        }
     </style>
 </head>
 <body>
     <div id="video-container">
-        <video id="my-video" class="video-js" controls preload="auto">
+        <video id="my-video" class="video-js vjs-default-skin" controls preload="auto" playsinline>
             <source src="{{ episode_url }}" type="application/x-mpegURL">
         </video>
         <div id="episode-name" class="episode-name-overlay">
@@ -214,6 +220,7 @@
         let retryCount = 0; // Initialize retry counter
         let adDisplayContainer;
         let adRequestInProgress = false; // Flag to prevent multiple ad requests
+        let videoEnded = false; // Flag to track if video has ended
 
         function generateSessionId() {
             return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -230,6 +237,7 @@
             // Dispose of existing player and ads
             disposePlayer();
             destroyAds();
+            videoEnded = false; // Reset videoEnded flag
             let isMobileDevice = isMobile();
 
             player = videojs('my-video', {
@@ -238,7 +246,8 @@
                 controls: true,
                 playsinline: true,
                 fullscreen: {
-                    enabled: false
+                    enabled: true, // Enable fullscreen to support ads in fullscreen
+                    iosNative: false
                 }
             });
 
@@ -271,7 +280,9 @@
                             adDisplayContainerInitialized = true;
                         }
                     }
-                    if (!prerollRequested && scteMarkers.length > 0 && scteMarkers[0].time === 0) {
+
+                    // Only request preroll ad if video has not ended
+                    if (!prerollRequested && scteMarkers.length > 0 && scteMarkers[0].time === 0 && !videoEnded) {
                         prerollRequested = true;
                         adPlaying = true;
                         player.pause();
@@ -279,19 +290,24 @@
                         requestAds();
                         return;
                     }
+
                     if (adPlaying) {
                         player.pause();
                     }
+
                     showEpisodeName();
                     setTimeout(hideEpisodeName, 3000);
                 });
             });
+
             player.on('pause', hideEpisodeName);
             player.on('ended', function() {
+                videoEnded = true; // Set videoEnded flag
                 if (adsLoader) {
                     adsLoader.contentComplete();
                 }
             });
+
             player.el().addEventListener('mousemove', handleMouseMove);
             player.el().addEventListener('mouseenter', handleMouseEnter);
             player.el().addEventListener('mouseleave', handleMouseLeave);
@@ -308,7 +324,16 @@
                     }
                 });
             }
+
+            // Handle fullscreen changes to ensure ads play correctly
+            player.on('fullscreenchange', function() {
+                if (adsManager) {
+                    const viewMode = player.isFullscreen() ? google.ima.ViewMode.FULLSCREEN : google.ima.ViewMode.NORMAL;
+                    adsManager.resize(player.el().offsetWidth, player.el().offsetHeight, viewMode);
+                }
+            });
         }
+
         // Function to dispose of the player
         function disposePlayer() {
             if (player) {
@@ -318,6 +343,7 @@
                 player.off('play');
                 player.off('pause');
                 player.off('ended');
+                player.off('fullscreenchange');
 
                 player.el().removeEventListener('mousemove', handleMouseMove);
                 player.el().removeEventListener('mouseenter', handleMouseEnter);
@@ -358,17 +384,18 @@
             hideEpisodeName();
             clearTimeout(mouseTimer);
         }
-          function resetMouseTimer() {
-              clearTimeout(mouseTimer);
-              mouseTimer = setTimeout(() => {
-                  hideEpisodeName();
-              }, 2000);
-          }
-        
+
+        function resetMouseTimer() {
+            clearTimeout(mouseTimer);
+            mouseTimer = setTimeout(() => {
+                hideEpisodeName();
+            }, 2000);
+        }
 
         function goBack() {
             window.history.back();
         }
+
         function showEpisodeName() {
             const episodeNameOverlay = document.getElementById('episode-name');
             episodeNameOverlay.style.opacity = '1';
@@ -408,7 +435,7 @@
 
             if (!adDisplayContainer) {
                 // Create the AdDisplayContainer if it hasn't been created yet
-                adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
+                adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, player.el());
             }
 
             if (!adsLoader) {
@@ -670,7 +697,7 @@
             try {
                 adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
                 adsManager.start();
-                hideSpinner(); // Hide spinner after adsManager starts successfully
+                // Do not hide spinner here; manage spinner visibility based on ad loading state
             } catch (adError) {
                 console.error('AdsManager could not be started:', adError);
                 onAdError(); // Call onAdError to handle retry logic
@@ -694,7 +721,7 @@
             player.el().style.pointerEvents = 'none';
             adContainer.style.display = 'block';
             adPlaying = true;
-            hideSpinner(); // Hide spinner when ad is about to play
+            showSpinner(); // Show spinner when ad is about to play
         }
 
         function onContentResumeRequested() {
@@ -709,6 +736,7 @@
                 savedTime = undefined;
             }
             player.play();
+            hideSpinner(); // Hide spinner when content resumes
         }
 
         function onAdError(adErrorEvent) {
@@ -724,14 +752,13 @@
             if (retryCount < MAX_RETRIES) {
                 retryCount++;
                 console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
-                hideSpinner(); // Hide spinner before retrying to prevent overlapping spinners
+                // Do not hide the spinner here to prevent flicker
                 adRequestInProgress = false; // Reset the ad request flag to allow retry
 
-                // Implementing a delay before retrying (optional but recommended)
+                // Implementing a delay before retrying (exponential backoff)
                 setTimeout(() => {
-                    showSpinner(); // Show spinner when retrying
                     requestAds();
-                }, 0); // Exponential backoff: 1s, 2s, 3s, etc.
+                }, 0); // 1s, 2s, 3s, etc.
             } else {
                 console.error('Max ad retries reached. Proceeding without ads.');
                 adPlaying = false;
@@ -745,14 +772,16 @@
         function onAllAdsCompleted() {
             adPlaying = false;
             player.removeClass('vjs-controls-hidden');
-            player.play();
+            if (!videoEnded) { // Only play if video hasn't ended
+                player.play();
+            }
             hideSpinner(); // Hide spinner when all ads are completed
             retryCount = 0; // Reset retry count after ads complete
             adRequestInProgress = false; // Reset the ad request flag
         }
 
         function handleTimeUpdate() {
-            if (adPlaying) {
+            if (adPlaying || videoEnded) {
                 return;
             }
             const currentTime = player.currentTime();
@@ -769,6 +798,9 @@
         }
 
         function handleSeeking() {
+            if (videoEnded) {
+                return;
+            }
             const currentTime = player.currentTime();
             const bufferTime = 0.5;
 
@@ -787,7 +819,8 @@
 
         window.addEventListener('resize', function() {
             if (adsManager) {
-                adsManager.resize(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
+                const viewMode = player.isFullscreen() ? google.ima.ViewMode.FULLSCREEN : google.ima.ViewMode.NORMAL;
+                adsManager.resize(player.el().offsetWidth, player.el().offsetHeight, viewMode);
             }
         });
 
