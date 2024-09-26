@@ -721,13 +721,14 @@ p.truncate a  {
 
 .show-detail-episode-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
     gap: 25px;
-    justify-content: center;
+    justify-content: start;
     padding: 20px 0;
     max-width: 1200px;
     margin: 0 auto;
 }
+
 
 .show-detail-episode-card {
     width: 100%;

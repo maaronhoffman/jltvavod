@@ -12,6 +12,7 @@
     <!-- Custom styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <style>
         body, html {
             margin: 0;
@@ -92,6 +93,7 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
+            z-index: 1000;
         }
 
         @media screen and (min-width: 768px) {
@@ -108,39 +110,67 @@
         }
 
         #back-button {
-    background-color: rgba(0, 0, 0, 0.6);
-    color: #fff;
-    border: none;
-    padding: 10px 15px;
-    cursor: pointer;
-    border-radius: 5px;
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    transition: background-color 0.3s ease;
-    z-index: 1002; /* Ensure it's above other elements */
-    pointer-events: auto; /* Ensure it can receive pointer events */
-}
+            background-color: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s ease;
+            z-index: 1002; /* Ensure it's above other elements */
+            pointer-events: auto; /* Ensure it can receive pointer events */
+        }
+    
+        #back-button:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+    
+       /* Arrange show-info-header elements in a row */
+        .show-info-header {
+            display: flex;
+            align-items: center;
+            gap: 20px; /* Space between back button and show info */
+            position: relative;
+            z-index: 1001; /* Ensure it's above other elements */
+        }
+    
+        /* Optional: Style for show-info div */
+        .show-info {
+            display: flex;
+            flex-direction: column;
+        }
 
-#back-button:hover {
-    background-color: rgba(0, 0, 0, 0.8);
-}
+        /* Hide Video.js's native spinner when 'hide-videojs-spinner' class is applied */
+        .hide-videojs-spinner .vjs-loading-spinner {
+            display: none;
+        }
 
-   /* Arrange show-info-header elements in a row */
-.show-info-header {
-    display: flex;
-    align-items: center;
-    gap: 20px; /* Space between back button and show info */
-    position: relative;
-    z-index: 1001; /* Ensure it's above other elements */
-}
+        /* Spinner Overlay Styles */
+        #spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1001; /* Above ad-container (1000) and other elements (1001, 1002) */
+            display: none; /* Hidden by default */
+        }
 
-/* Optional: Style for show-info div */
-.show-info {
-    display: flex;
-    flex-direction: column;
-}
+        .spinner {
+            border: 5px solid rgba(255, 255, 255, 0.3); /* Light grey with transparency */
+            border-top: 5px solid rgb(15, 169, 231); /* White border-top */
+            border-radius: 50%;
+            width: 50px; /* Match Video.js spinner size */
+            height: 50px; /* Match Video.js spinner size */
+            animation: spin 1s linear infinite; /* Match Video.js spinner animation */
+        }
 
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -150,19 +180,23 @@
         </video>
         <div id="episode-name" class="episode-name-overlay">
             <div class="show-info-header">
-                <button id="back-button" onclick="goBack()" aria-label="Go Back">&#8592; Back</button>
+                <button id="back-button" onclick="goBack()" aria-label="Go Back"><i class="bi bi-chevron-left"></i></button>
                 <div class="show-info">
                     <h1 class="show-title-player">{{ show.name }}</h1>
                     <h2 class="episode-title-player">{{ episode.name }}</h2>
                 </div>
             </div>
         </div>
-        <div id="ad-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000;"></div>
+        <div id="ad-container"></div>
+        <!-- Loading Spinner -->
+        <div id="spinner">
+            <div class="spinner"></div>
+        </div>
     </div>
 
     <script>
         const IMA_SDK_URL = 'https://imasdk.googleapis.com/js/sdkloader/ima3.js';
-        const MAX_RETRIES = 3; // Maximum number of retries
+        const MAX_RETRIES = 5; // Maximum number of retries
         let adPlayed = false;
         let player, adContainer, adPlaying, scteMarkers, adsManager, adsLoader, lastPlayedCuePoint;
         let imaSDKLoaded = false;
@@ -173,6 +207,7 @@
         let prerollRequested = false;
         let adDisplayContainerInitialized = false;
         let retryCount = 0; // Initialize retry counter
+        let adDisplayContainer;
 
         function generateSessionId() {
             return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -182,11 +217,13 @@
             return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
 
+        // Load the IMA SDK and initialize IMA
+        loadIMASDK(initIMA);
+
         function initializePlayer() {
             // Dispose of existing player and ads
             disposePlayer();
             destroyAds();
-
             let isMobileDevice = isMobile();
 
             player = videojs('my-video', {
@@ -210,12 +247,9 @@
             prerollRequested = false;
             savedTime = undefined;
             retryCount = 0;
-            adDisplayContainerInitialized = false; // Reset initialization flag
 
             player.on('timeupdate', handleTimeUpdate);
             player.on('seeking', handleSeeking);
-
-            loadIMASDK(initIMA);
 
             const episodeNameOverlay = document.getElementById('episode-name');
             const episodeNameH2 = episodeNameOverlay.querySelector('h2');
@@ -234,6 +268,7 @@
                         prerollRequested = true;
                         adPlaying = true;
                         player.pause();
+                        showSpinner(); // Show spinner when requesting preroll ads
                         requestAds();
                         return;
                     }
@@ -245,6 +280,11 @@
                 });
             });
             player.on('pause', hideEpisodeName);
+            player.on('ended', function() {
+                if (adsLoader) {
+                    adsLoader.contentComplete();
+                }
+            });
             player.el().addEventListener('mousemove', handleMouseMove);
             player.el().addEventListener('mouseenter', handleMouseEnter);
             player.el().addEventListener('mouseleave', handleMouseLeave);
@@ -258,23 +298,21 @@
                 player.off('seeking', handleSeeking);
                 player.off('play');
                 player.off('pause');
+                player.off('ended');
 
                 player.dispose();
                 player = null;
             }
         }
 
-        // Function to destroy AdsManager and AdsLoader
+        // Function to destroy AdsManager (but not AdsLoader or AdDisplayContainer)
         function destroyAds() {
             if (adsManager) {
                 adsManager.destroy();
                 adsManager = null;
             }
-            if (adsLoader) {
-                adsLoader.contentComplete();
-                adsLoader = null;
-            }
-            adDisplayContainerInitialized = false;
+            // Do not reset adDisplayContainerInitialized
+            // Do not destroy adsLoader or adDisplayContainer
         }
 
         function handleMouseMove() {
@@ -344,22 +382,23 @@
                 return;
             }
 
-            // Re-create the AdDisplayContainer
-            adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
+            if (!adDisplayContainer) {
+                // Create the AdDisplayContainer if it hasn't been created yet
+                adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
+            }
 
-            // Reset initialization flag
-            adDisplayContainerInitialized = false;
-
-            // Create a new AdsLoader
-            adsLoader = new google.ima.AdsLoader(adDisplayContainer);
-            adsLoader.addEventListener(
-                google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-                onAdsManagerLoaded,
-                false);
-            adsLoader.addEventListener(
-                google.ima.AdErrorEvent.Type.AD_ERROR,
-                onAdError,
-                false);
+            if (!adsLoader) {
+                // Create AdsLoader if it hasn't been created yet
+                adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+                adsLoader.addEventListener(
+                    google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+                    onAdsManagerLoaded,
+                    false);
+                adsLoader.addEventListener(
+                    google.ima.AdErrorEvent.Type.AD_ERROR,
+                    onAdError,
+                    false);
+            }
         }
 
         function getRandomPublicIP() {
@@ -402,7 +441,7 @@
             const timestamp = Date.now();
             const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
 
-            const currentIP = await getCurrentIP(true);
+            const currentIP = await getCurrentIP(false); // Changed to false as per user request
 
             // Gather additional dynamic data
             const episodeName = "{{ episode.name }}";
@@ -543,13 +582,14 @@
             adsManager = adsManagerLoadedEvent.getAdsManager(player.el());
             adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
             adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
-            adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError);
+            adsManager.addEventListener(google.ima.AdEvent.Type.AD_ERROR, onAdError);
             adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, onAllAdsCompleted);
             adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdEnded);
 
             try {
                 adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
                 adsManager.start();
+                hideSpinner(); // Hide spinner after adsManager starts successfully
             } catch (adError) {
                 console.error('AdsManager could not be started:', adError);
                 onAdError(); // Call onAdError to handle retry logic
@@ -562,6 +602,7 @@
             }
             player.el().style.pointerEvents = 'auto';
             player.controls(true);
+            hideSpinner(); // Hide spinner when ad ends
             retryCount = 0; // Reset retry count after a successful ad play
         }
 
@@ -571,6 +612,7 @@
             player.el().style.pointerEvents = 'none';
             adContainer.style.display = 'block';
             adPlaying = true;
+            hideSpinner(); // Hide spinner when ad is about to play
         }
 
         function onContentResumeRequested() {
@@ -600,10 +642,12 @@
             if (retryCount < MAX_RETRIES) {
                 retryCount++;
                 console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
+                showSpinner(); // Show spinner when retrying
                 requestAds();
             } else {
                 console.error('Max ad retries reached. Proceeding without ads.');
                 adPlaying = false;
+                hideSpinner(); // Hide spinner when max retries reached
                 retryCount = 0; // Reset retry count
                 player.play();
             }
@@ -613,6 +657,7 @@
             adPlaying = false;
             player.removeClass('vjs-controls-hidden');
             player.play();
+            hideSpinner(); // Hide spinner when all ads are completed
             retryCount = 0; // Reset retry count after ads complete
         }
 
@@ -626,6 +671,7 @@
                     adPlaying = true;
                     lastPlayedCuePoint = index;
                     player.pause();
+                    showSpinner(); // Show spinner when requesting mid-roll ads
                     requestAds();
                 }
             });
@@ -643,6 +689,7 @@
                 player.pause();
                 adPlaying = true;
                 savedTime = currentTime;
+                showSpinner(); // Show spinner when requesting ads due to seeking
                 requestAds();
             }
         }
@@ -662,6 +709,28 @@
             disposePlayer();
             destroyAds();
         });
+
+        function showSpinner() {
+            const spinner = document.getElementById('spinner');
+            if (spinner) {
+                spinner.style.display = 'block';
+            }
+            const videoPlayer = document.querySelector('.video-js');
+            if (videoPlayer) {
+                videoPlayer.classList.add('hide-videojs-spinner');
+            }
+        }
+
+        function hideSpinner() {
+            const spinner = document.getElementById('spinner');
+            if (spinner) {
+                spinner.style.display = 'none';
+            }
+            const videoPlayer = document.querySelector('.video-js');
+            if (videoPlayer) {
+                videoPlayer.classList.remove('hide-videojs-spinner');
+            }
+        }
 
         initializePlayer();
     </script>
