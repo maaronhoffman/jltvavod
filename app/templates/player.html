@@ -79,11 +79,10 @@
         }
 
         .video-js .vjs-big-play-button {
-        background-color: transparent;
-        width: 200px;
-        height: 200px;
-        border-color: transparent;
-            
+            background-color: transparent;
+            width: 200px;
+            height: 200px;
+            border-color: transparent;
         }
 
         #ad-container {
@@ -97,18 +96,50 @@
 
         @media screen and (min-width: 768px) {
             .video-js .vjs-big-play-button {
-        display: none;
-            
-        }
+                display: none;
+            }
         }
 
         .video-js .vjs-big-play-button:hover {
-        display: none;
-            
+            display: none;
         }
         .video-js.vjs-has-autoplay .vjs-big-play-button {
             display: none !important;
         }
+
+        #back-button {
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.3s ease;
+    z-index: 1002; /* Ensure it's above other elements */
+    pointer-events: auto; /* Ensure it can receive pointer events */
+}
+
+#back-button:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+   /* Arrange show-info-header elements in a row */
+.show-info-header {
+    display: flex;
+    align-items: center;
+    gap: 20px; /* Space between back button and show info */
+    position: relative;
+    z-index: 1001; /* Ensure it's above other elements */
+}
+
+/* Optional: Style for show-info div */
+.show-info {
+    display: flex;
+    flex-direction: column;
+}
 
     </style>
 </head>
@@ -119,8 +150,11 @@
         </video>
         <div id="episode-name" class="episode-name-overlay">
             <div class="show-info-header">
-                <h1 class="show-title-player">{{ show.name }}</h1>
-                <h2 class="episode-title-player">{{ episode.name }}</h2>
+                <button id="back-button" onclick="goBack()" aria-label="Go Back">&#8592; Back</button>
+                <div class="show-info">
+                    <h1 class="show-title-player">{{ show.name }}</h1>
+                    <h2 class="episode-title-player">{{ episode.name }}</h2>
+                </div>
             </div>
         </div>
         <div id="ad-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000;"></div>
@@ -149,6 +183,10 @@
         }
 
         function initializePlayer() {
+            // Dispose of existing player and ads
+            disposePlayer();
+            destroyAds();
+
             let isMobileDevice = isMobile();
 
             player = videojs('my-video', {
@@ -169,15 +207,20 @@
             lastPlayedCuePoint = -1;
             sessionId = generateSessionId();
             adRequestQueue.length = 0;
+            prerollRequested = false;
+            savedTime = undefined;
+            retryCount = 0;
+            adDisplayContainerInitialized = false; // Reset initialization flag
 
             player.on('timeupdate', handleTimeUpdate);
             player.on('seeking', handleSeeking);
 
             loadIMASDK(initIMA);
+
             const episodeNameOverlay = document.getElementById('episode-name');
             const episodeNameH2 = episodeNameOverlay.querySelector('h2');
             episodeNameH2.textContent = "{{ episode.name }}";
-            console.log("Set episode name:", episodeNameOverlay.textContent);
+            // console.log("Set episode name:", episodeNameOverlay.textContent);
 
             player.ready(function() {
                 player.on('play', function() {
@@ -207,33 +250,63 @@
             player.el().addEventListener('mouseleave', handleMouseLeave);
         }
 
+        // Function to dispose of the player
+        function disposePlayer() {
+            if (player) {
+                // Remove event listeners to prevent duplication
+                player.off('timeupdate', handleTimeUpdate);
+                player.off('seeking', handleSeeking);
+                player.off('play');
+                player.off('pause');
+
+                player.dispose();
+                player = null;
+            }
+        }
+
+        // Function to destroy AdsManager and AdsLoader
+        function destroyAds() {
+            if (adsManager) {
+                adsManager.destroy();
+                adsManager = null;
+            }
+            if (adsLoader) {
+                adsLoader.contentComplete();
+                adsLoader = null;
+            }
+            adDisplayContainerInitialized = false;
+        }
+
         function handleMouseMove() {
-            console.log("Mouse moved");
+            // console.log("Mouse moved");
             showEpisodeName();
             resetMouseTimer();
         }
 
         function handleMouseEnter() {
-            console.log("Mouse entered");
+            // console.log("Mouse entered");
             showEpisodeName();
             resetMouseTimer();
         }
 
         function handleMouseLeave() {
-            console.log("Mouse left");
+            // console.log("Mouse left");
             hideEpisodeName();
             clearTimeout(mouseTimer);
         }
 
         function resetMouseTimer() {
-            console.log("Resetting mouse timer");
+            // console.log("Resetting mouse timer");
             clearTimeout(mouseTimer);
             mouseTimer = setTimeout(() => {
-                console.log("Mouse timer expired");
+                // console.log("Mouse timer expired");
                 hideEpisodeName();
             }, 2000);
         }
 
+        function goBack() {
+            window.history.back();
+        }
         function showEpisodeName() {
             const episodeNameOverlay = document.getElementById('episode-name');
             episodeNameOverlay.style.opacity = '1';
@@ -245,6 +318,12 @@
         }
 
         function loadIMASDK(callback) {
+            if (typeof google !== 'undefined' && typeof google.ima !== 'undefined') {
+                imaSDKLoaded = true;
+                callback();
+                processAdQueue();
+                return;
+            }
             const script = document.createElement('script');
             script.src = IMA_SDK_URL;
             script.async = true;
@@ -265,9 +344,13 @@
                 return;
             }
 
+            // Re-create the AdDisplayContainer
             adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
-            adDisplayContainer.initialize(); // Initialize immediately
 
+            // Reset initialization flag
+            adDisplayContainerInitialized = false;
+
+            // Create a new AdsLoader
             adsLoader = new google.ima.AdsLoader(adDisplayContainer);
             adsLoader.addEventListener(
                 google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
@@ -294,8 +377,15 @@
             if (useRandom) {
                 return getRandomPublicIP();
             }
-            // Implement actual IP fetching logic if needed
-            return '0.0.0.0';
+            
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                return data.ip;
+            } catch (error) {
+                console.error('Error fetching IP:', error);
+                return '0.0.0.0';
+            }
         }
 
         async function requestAds() {
@@ -310,22 +400,42 @@
             }
 
             const timestamp = Date.now();
-            const cacheBuster = timestamp + Math.random().toString(36).substring(2);
+            const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
 
             const currentIP = await getCurrentIP(true);
 
+            // Gather additional dynamic data
             const episodeName = "{{ episode.name }}";
             const showName = "{{ show.name }}";
+            const episodeId = "{{ episode.id }}"; // Assuming you have an episode ID
+            const showId = "{{ show.id }}"; // Assuming you have a show ID
+            const referrer = document.referrer || 'direct';
+            const pageURL = window.location.href;
+            const contentGenre = "{{ episode.genre }}"; // Assuming genre is available
+            const userAgent = navigator.userAgent;
+            const language = navigator.language || 'en';
 
-            // Build a params object
+            // Device Information
+            const screenWidth = window.screen.width;
+            const screenHeight = window.screen.height;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const deviceType = isMobile() ? 'mobile' : 'desktop';
+            const os = getOS(); // Function to determine OS
+            const browser = getBrowser(); // Function to determine browser
+            const sitePage = window.location.href;
+            // Content Length in seconds
+            const contentLength = Math.floor(player.duration()) || 0;
+
+            // VAST Parameters
             const vastParams = {
                 site_id: '49382',
-                site_page: episodeName,
+                site_page: sitePage,
                 format: 'vast',
-                pod_duration: '60', // Assuming 0
+                pod_duration: '60',
                 cb: cacheBuster,
                 ip: currentIP,
-                ua: navigator.userAgent,
+                ua: userAgent,
                 player_height: player.el().offsetHeight,
                 player_width: player.el().offsetWidth,
                 is_lat: 'false',
@@ -334,24 +444,92 @@
                 timestamp: timestamp,
                 content_title: episodeName,
                 content_series: showName,
-                content_length: Math.floor(player.duration()) || 0,
-                content_language: 'en',
-                
+                content_id: episodeId, // Unique identifier for the content
+                show_id: showId, // Unique identifier for the show
+                content_length: contentLength,
+                content_language: language,
+                referrer: referrer,
+                page_url: pageURL,
+                content_genre: contentGenre,
+                screen_width: screenWidth,
+                screen_height: screenHeight,
+                viewport_width: viewportWidth,
+                viewport_height: viewportHeight,
+                device_type: deviceType,
+                operating_system: os,
+                browser: browser,
+                // Add any additional parameters as required by your ad server
             };
 
-            // Build the vastUrl
-            let vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?' + Object.keys(vastParams)
-                .map(key => key + '=' + encodeURIComponent(vastParams[key]))
-                .join('&');
+            // Optionally, remove undefined or null parameters
+            Object.keys(vastParams).forEach(key => {
+                if (vastParams[key] === undefined || vastParams[key] === null) {
+                    delete vastParams[key];
+                }
+            });
 
+            // Build the VAST URL
+            const vastUrl = `https://obs.ads.ottera.tv/v1/s2s-hb?${new URLSearchParams(vastParams).toString()}`;
+
+            console.log("VAST URL:", vastUrl); // For debugging purposes
+
+            // Configure the AdsRequest
             const adsRequest = new google.ima.AdsRequest();
             adsRequest.adTagUrl = vastUrl;
+
+            // Set ad slot sizes
             adsRequest.linearAdSlotWidth = player.el().offsetWidth;
             adsRequest.linearAdSlotHeight = player.el().offsetHeight;
             adsRequest.nonLinearAdSlotWidth = player.el().offsetWidth;
             adsRequest.nonLinearAdSlotHeight = player.el().offsetHeight;
 
+            // Make the ad request
             adsLoader.requestAds(adsRequest);
+        }
+
+        // Utility function to determine Operating System
+        function getOS() {
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            if (/windows phone/i.test(userAgent)) {
+                return "Windows Phone";
+            }
+            if (/android/i.test(userAgent)) {
+                return "Android";
+            }
+            if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+                return "iOS";
+            }
+            if (/Win/i.test(userAgent)) {
+                return "Windows";
+            }
+            if (/Mac/i.test(userAgent)) {
+                return "MacOS";
+            }
+            if (/Linux/i.test(userAgent)) {
+                return "Linux";
+            }
+            return "Unknown";
+        }
+
+        // Utility function to determine Browser
+        function getBrowser() {
+            const userAgent = navigator.userAgent;
+            if (userAgent.indexOf("Firefox") > -1) {
+                return "Firefox";
+            } else if (userAgent.indexOf("SamsungBrowser") > -1) {
+                return "Samsung Internet";
+            } else if (userAgent.indexOf("Opera") > -1 || userAgent.indexOf("OPR") > -1) {
+                return "Opera";
+            } else if (userAgent.indexOf("Trident") > -1) {
+                return "Internet Explorer";
+            } else if (userAgent.indexOf("Edge") > -1) {
+                return "Edge";
+            } else if (userAgent.indexOf("Chrome") > -1) {
+                return "Chrome";
+            } else if (userAgent.indexOf("Safari") > -1) {
+                return "Safari";
+            }
+            return "Unknown";
         }
 
         function processAdQueue() {
@@ -416,6 +594,7 @@
 
             if (adsManager) {
                 adsManager.destroy();
+                adsManager = null;
             }
 
             if (retryCount < MAX_RETRIES) {
@@ -478,6 +657,10 @@
             adRequestQueue.length = 0;
             lastPlayedCuePoint = -1;
             sessionId = generateSessionId();
+
+            // Dispose player and ads to clean up
+            disposePlayer();
+            destroyAds();
         });
 
         initializePlayer();
