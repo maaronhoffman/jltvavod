@@ -5,17 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Player</title>
-    <!-- Video.js, HLS.js, and Plugins -->
+    <!-- Video.js and HLS.js -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <link href="https://vjs.zencdn.net/7.10.2/video-js.min.css" rel="stylesheet">
     <script src="https://vjs.zencdn.net/7.10.2/video.min.js"></script>
-    <!-- videojs-contrib-ads -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-ads/6.8.0/videojs-contrib-ads.min.js"></script>
-    <!-- Google IMA SDK -->
-    <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
-    <!-- Video.js IMA Plugin -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/videojs-ima/1.10.1/videojs.ima.min.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-ima/1.10.1/videojs.ima.min.js"></script>
     <!-- Custom styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
@@ -96,13 +89,13 @@
         }
 
         #ad-container {
-            position: fixed; /* Changed from absolute to fixed */
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 999999; /* Increased z-index to ensure it's above Video.js's fullscreen elements */
+            z-index: 100000;
         }
 
         @media screen and (min-width: 768px) {
@@ -159,11 +152,11 @@
 
         /* Spinner Overlay Styles */
         #spinner {
-            position: fixed; /* Changed from absolute to fixed */
+            position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            z-index: 1001; /* Above ad-container (999999) and other elements */
+            z-index: 1001; /* Above ad-container (1000) and other elements (1001, 1002) */
             display: none; /* Hidden by default */
         }
 
@@ -174,7 +167,6 @@
             width: 50px; /* Match Video.js spinner size */
             height: 50px; /* Match Video.js spinner size */
             animation: spin 1s linear infinite; /* Match Video.js spinner animation */
-            display: none;
         }
 
         @keyframes spin {
@@ -187,17 +179,9 @@
             display: none !important;
         }
 
-        /* Fullscreen Styles Enhancements */
-        .video-js.vjs-fullscreen .show-info-header {
-            /* Example: Adjust positioning when in fullscreen */
-            top: 10px;
-            left: 10px;
-        }
-
-        /* Optional: Style adjustments for fullscreen mode */
-        .video-js.vjs-fullscreen .vjs-control-bar {
-            /* Make control bar more prominent in fullscreen */
-            background-color: rgba(0, 0, 0, 0.8) !important;
+        /* Fullscreen Styles */
+        .vjs-fullscreen .show-info-header {
+            /* Adjust positioning or styles if needed when in fullscreen */
         }
     </style>
 </head>
@@ -208,29 +192,36 @@
         </video>
         <div id="episode-name" class="episode-name-overlay">
             <div class="show-info-header">
-                <button id="back-button" onclick="goBack()" aria-label="Go Back">
-                    <i class="bi bi-chevron-left"></i>
-                </button>
+                <button id="back-button" onclick="goBack()" aria-label="Go Back"><i class="bi bi-chevron-left"></i></button>
                 <div class="show-info">
                     <h1 class="show-title-player">{{ show.name }}</h1>
                     <h2 class="episode-title-player">{{ episode.name }}</h2>
                 </div>
             </div>
         </div>
-    </div>
-    <div id="ad-container"></div> <!-- Moved outside of video-container -->
-    <!-- Loading Spinner -->
-    <div id="spinner">
-        <div class="spinner"></div>
+        <div id="ad-container"></div>
+        <!-- Loading Spinner -->
+        <div id="spinner">
+            <div class="spinner"></div>
+        </div>
     </div>
     
     <script>
-        let player;
-        let scteMarkers = {{ scte_markers|safe }};
-        let lastPlayedCuePoint = -1;
-        let adPlaying = false;
+        const IMA_SDK_URL = 'https://imasdk.googleapis.com/js/sdkloader/ima3.js';
+        const MAX_RETRIES = 5; // Maximum number of retries
+        let adPlayed = false;
+        let player, adContainer, adPlaying, scteMarkers, adsManager, adsLoader, lastPlayedCuePoint;
+        let imaSDKLoaded = false;
         let mouseTimer;
-        let adTimeout; // For fallback
+        const adRequestQueue = [];
+        let sessionId;
+        let savedTime;
+        let prerollRequested = false;
+        let adDisplayContainerInitialized = false;
+        let retryCount = 0; // Initialize retry counter
+        let adDisplayContainer;
+        let adRequestInProgress = false; // Flag to prevent multiple ad requests
+        let videoEnded = false; // Flag to track if video has ended
 
         function generateSessionId() {
             return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -238,6 +229,229 @@
 
         function isMobile() {
             return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        // Load the IMA SDK and initialize IMA
+        loadIMASDK(initIMA);
+
+        function initializePlayer() {
+            // Dispose of existing player and ads
+            disposePlayer();
+            destroyAds();
+            videoEnded = false; // Reset videoEnded flag
+            let isMobileDevice = isMobile();
+
+            player = videojs('my-video', {
+                autoplay: !isMobileDevice, // On mobile devices, do not autoplay
+                muted: !isMobileDevice, // On mobile devices, do not mute
+                controls: true,
+                playsinline: true,
+                fullscreen: {
+                    enabled: true, // Enable fullscreen to support ads in fullscreen
+                    iosNative: false
+                }
+            });
+
+            adContainer = document.getElementById('ad-container');
+            adContainer.style.display = 'none';
+            adPlaying = false;
+            adPlayed = false;
+            scteMarkers = {{ scte_markers|safe }};
+            lastPlayedCuePoint = -1;
+            sessionId = generateSessionId();
+            adRequestQueue.length = 0;
+            prerollRequested = false;
+            savedTime = undefined;
+            retryCount = 0;
+            adRequestInProgress = false; // Reset the ad request flag
+
+            player.on('timeupdate', handleTimeUpdate);
+            player.on('seeking', handleSeeking);
+
+            const episodeNameOverlay = document.getElementById('episode-name');
+            const episodeNameH2 = episodeNameOverlay.querySelector('h2');
+            episodeNameH2.textContent = "{{ episode.name }}";
+            // console.log("Set episode name:", episodeNameOverlay.textContent);
+
+            player.ready(function() {
+                player.on('play', function() {
+                    if (!adDisplayContainerInitialized) {
+                        if (adDisplayContainer && adDisplayContainer.initialize) {
+                            adDisplayContainer.initialize();
+                            adDisplayContainerInitialized = true;
+                        }
+                    }
+
+                    // Only request preroll ad if video has not ended
+                    if (!prerollRequested && scteMarkers.length > 0 && scteMarkers[0].time === 0 && !videoEnded) {
+                        prerollRequested = true;
+                        adPlaying = true;
+                        player.pause();
+                        showSpinner(); // Show spinner when requesting preroll ads
+                        requestAds();
+                        return;
+                    }
+
+                    if (adPlaying) {
+                        player.pause();
+                    }
+
+                    showEpisodeName();
+                    setTimeout(hideEpisodeName, 3000);
+                });
+            });
+
+            player.on('pause', hideEpisodeName);
+            player.on('ended', function() {
+                videoEnded = true; // Set videoEnded flag
+                if (adsLoader) {
+                    adsLoader.contentComplete();
+                }
+            });
+
+            player.el().addEventListener('mousemove', handleMouseMove);
+            player.el().addEventListener('mouseenter', handleMouseEnter);
+            player.el().addEventListener('mouseleave', handleMouseLeave);
+            player.el().addEventListener('touchstart', handleTouch);
+            player.el().addEventListener('touchmove', handleTouch);
+            player.el().addEventListener('touchend', handleTouch);
+
+            // Hide the big play button on mobile devices when play starts
+            if (isMobileDevice) {
+                player.on('play', function() {
+                    const videoContainer = document.getElementById('video-container');
+                    if (videoContainer) {
+                        videoContainer.classList.add('hide-big-play-button');
+                    }
+                });
+            }
+
+            // Handle fullscreen changes to ensure ads play correctly
+            player.on('fullscreenchange', function() {
+            if (adsManager) {
+                const viewMode = player.isFullscreen() ? google.ima.ViewMode.FULLSCREEN : google.ima.ViewMode.NORMAL;
+                adsManager.resize(player.el().offsetWidth, player.el().offsetHeight, viewMode);
+            }
+        });
+
+        }
+
+        // Function to dispose of the player
+        function disposePlayer() {
+            if (player) {
+                // Remove event listeners to prevent duplication
+                player.off('timeupdate', handleTimeUpdate);
+                player.off('seeking', handleSeeking);
+                player.off('play');
+                player.off('pause');
+                player.off('ended');
+                player.off('fullscreenchange');
+
+                player.el().removeEventListener('mousemove', handleMouseMove);
+                player.el().removeEventListener('mouseenter', handleMouseEnter);
+                player.el().removeEventListener('mouseleave', handleMouseLeave);
+                player.el().removeEventListener('touchstart', handleTouch);
+                player.el().removeEventListener('touchmove', handleTouch);
+                player.el().removeEventListener('touchend', handleTouch);
+
+                player.dispose();
+                player = null;
+            }
+        }
+
+        // Function to destroy AdsManager (but not AdsLoader or AdDisplayContainer)
+        function destroyAds() {
+            if (adsManager) {
+                adsManager.destroy();
+                adsManager = null;
+            }
+            // Do not reset adDisplayContainerInitialized
+            // Do not destroy adsLoader or adDisplayContainer
+        }
+
+        function handleMouseMove() {
+            // console.log("Mouse moved");
+            showEpisodeName();
+            resetMouseTimer();
+        }
+
+        function handleMouseEnter() {
+            // console.log("Mouse entered");
+            showEpisodeName();
+            resetMouseTimer();
+        }
+
+        function handleMouseLeave() {
+            // console.log("Mouse left");
+            hideEpisodeName();
+            clearTimeout(mouseTimer);
+        }
+
+        function resetMouseTimer() {
+            clearTimeout(mouseTimer);
+            mouseTimer = setTimeout(() => {
+                hideEpisodeName();
+            }, 2000);
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+
+        function showEpisodeName() {
+            const episodeNameOverlay = document.getElementById('episode-name');
+            episodeNameOverlay.style.opacity = '1';
+        }
+
+        function hideEpisodeName() {
+            const episodeNameOverlay = document.getElementById('episode-name');
+            episodeNameOverlay.style.opacity = '0';
+        }
+
+        function loadIMASDK(callback) {
+            if (typeof google !== 'undefined' && typeof google.ima !== 'undefined') {
+                imaSDKLoaded = true;
+                callback();
+                processAdQueue();
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = IMA_SDK_URL;
+            script.async = true;
+            script.onload = () => {
+                imaSDKLoaded = true;
+                callback();
+                processAdQueue();
+            };
+            script.onerror = () => {
+                console.error("Failed to load IMA SDK");
+            };
+            document.head.appendChild(script);
+        }
+
+        function initIMA() {
+            if (typeof google === 'undefined' || typeof google.ima === 'undefined') {
+                console.error("Google IMA SDK not loaded properly.");
+                return;
+            }
+
+            if (!adDisplayContainer) {
+                // Create the AdDisplayContainer if it hasn't been created yet
+                adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, player.el());
+            }
+
+            if (!adsLoader) {
+                // Create AdsLoader if it hasn't been created yet
+                adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+                adsLoader.addEventListener(
+                    google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+                    onAdsManagerLoaded,
+                    false);
+                adsLoader.addEventListener(
+                    google.ima.AdErrorEvent.Type.AD_ERROR,
+                    onAdError,
+                    false);
+            }
         }
 
         function getRandomPublicIP() {
@@ -272,6 +486,157 @@
                 .replace(/%5D/g, ']');
         }
 
+        async function requestAds() {
+            if (adRequestInProgress) {
+                console.warn("Ad request already in progress. Skipping duplicate request.");
+                return;
+            }
+
+            if (!imaSDKLoaded) {
+                adRequestQueue.push(true);
+                return;
+            }
+
+            if (!adDisplayContainerInitialized) {
+                console.warn("AdDisplayContainer not initialized yet");
+                return;
+            }
+
+            adRequestInProgress = true; // Set the flag to indicate ad request is in progress
+
+            const timestamp = Date.now();
+            const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
+
+            const currentIP = await getCurrentIP(false); // Changed to false as per user request
+
+            // Gather additional dynamic data
+            const episodeName = "{{ episode.name }}";
+            const showName = "{{ show.name }}";
+            const episodeId = "{{ episode.id }}"; // Assuming you have an episode ID
+            const showId = "{{ show.id }}"; // Assuming you have a show ID
+            const referrer = document.referrer || 'direct';
+            const pageURL = window.location.href;
+            const contentGenre = "{{ episode.genre }}"; // Assuming genre is available
+            const userAgent = navigator.userAgent;
+            const language = navigator.language || 'en';
+
+            // Device Information
+            const screenWidth = window.screen.width;
+            const screenHeight = window.screen.height;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const deviceType = isMobile() ? 'mobile' : 'desktop';
+            const os = getOS(); // Function to determine OS
+            const browser = getBrowser(); // Function to determine browser
+            const sitePage = window.location.href;
+            // Content Length in seconds
+            const contentLength = Math.floor(player.duration()) || 0;
+
+            // Define the parameters in order
+            const parameters = [
+                { name: 'site_id', placeholder: '49382', value: '49382' },
+                { name: 'site_page', placeholder: '[SITE_PAGE]', value: sitePage },
+                { name: 'format', placeholder: 'vast', value: 'vast' },
+                { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '60' },
+                { name: 'cb', placeholder: '[CACHEBUSTER]', value: cacheBuster },
+                { name: 'ip', placeholder: '[IP]', value: currentIP },
+                { name: 'ua', placeholder: '[UA]', value: userAgent },
+                { name: 'player_height', placeholder: '[HEIGHT]', value: player.el().offsetHeight },
+                { name: 'player_width', placeholder: '[WIDTH]', value: player.el().offsetWidth },
+                { name: 'is_lat', placeholder: '[LIMITED_AD_TRACKING]', value: 'false' },
+                { name: 'site_name', placeholder: '[CHANNEL_NAME]', value: 'JLTV' },
+                { name: 'content_cat', placeholder: '[CONTENT_CAT]', value: 'Faith' },
+                { name: 'content_channel', placeholder: '[CONTENT_CHANNEL]', value: undefined },
+                { name: 'content_context', placeholder: '[CONTENT_CONTEXT]', value: undefined },
+                { name: 'content_dist_id', placeholder: '[CONTENT_DIST_ID]', value: undefined },
+                { name: 'content_dist_name', placeholder: '[CONTENT_DIST_NAME]', value: undefined },
+                { name: 'content_episode', placeholder: '[CONTENT_EPISODE]', value: undefined },
+                { name: 'content_genre', placeholder: '[CONTENT_GENRE]', value: contentGenre },
+                { name: 'content_id', placeholder: '[CONTENT_ID]', value: episodeId },
+                { name: 'content_keywords', placeholder: '[CONTENT_KEYWORDS]', value: undefined },
+                { name: 'content_language', placeholder: '[CONTENT_LANGUAGE]', value: language },
+                { name: 'content_length', placeholder: '[CONTENT_LENGTH]', value: contentLength },
+                { name: 'content_network', placeholder: '[CONTENT_NETWORK]', value: undefined },
+                { name: 'content_prodqual', placeholder: '[CONTENT_PROD]', value: undefined },
+                { name: 'content_producer_id', placeholder: '[CONTENT_PRODUCER_ID]', value: undefined },
+                { name: 'content_producer', placeholder: '[CONTENT_PRODUCER_NAME]', value: undefined },
+                { name: 'content_rating', placeholder: '[CONTENT_RATING]', value: undefined },
+                { name: 'content_season', placeholder: '[CONTENT_SEASON]', value: undefined },
+                { name: 'content_series', placeholder: '[CONTENT_SERIES]', value: showName },
+                { name: 'content_title', placeholder: '[CONTENT_TITLE]', value: episodeName },
+                { name: 'content_url', placeholder: '[CONTENT_URL]', value: undefined },
+                { name: 'buyeruid', placeholder: '[BUYERUID]', value: undefined },
+                { name: 'us_privacy', placeholder: '[US_PRIVACY]', value: undefined },
+                { name: 'consent', placeholder: '[CONSENT]', value: undefined },
+                { name: 'coppa', placeholder: '[COPPA]', value: undefined },
+                { name: 'custom_5', placeholder: '[CUSTOM_5]', value: undefined },
+                { name: 'custom_6', placeholder: '[CUSTOM_6]', value: undefined },
+                { name: 'custom_7', placeholder: '[CUSTOM_7]', value: undefined },
+                { name: 'custom_8', placeholder: '[CUSTOM_8]', value: undefined },
+                { name: 'custom_9', placeholder: '[CUSTOM_9]', value: undefined },
+                { name: 'custom_10', placeholder: '[CUSTOM_10]', value: undefined },
+                { name: 'custom_11', placeholder: '[CUSTOM_11]', value: undefined },
+                { name: 'custom_12', placeholder: '[CUSTOM_12]', value: undefined },
+                { name: 'custom_13', placeholder: '[CUSTOM_13]', value: undefined },
+                { name: 'custom_14', placeholder: '[CUSTOM_14]', value: undefined },
+                { name: 'custom_15', placeholder: '[CUSTOM_15]', value: undefined },
+                { name: 'custom_16', placeholder: '[CUSTOM_16]', value: undefined },
+                { name: 'custom_17', placeholder: '[CUSTOM_17]', value: undefined },
+                { name: 'custom_18', placeholder: '[CUSTOM_18]', value: undefined },
+                { name: 'device_language', placeholder: '[DEVICE_LANGUAGE]', value: undefined },
+                { name: 'lat', placeholder: '[LAT]', value: undefined },
+                { name: 'lon', placeholder: '[LON]', value: undefined },
+                { name: 'device_type', placeholder: '[DEVICE_TYPE]', value: deviceType },
+                { name: 'gdpr', placeholder: '[GDPR]', value: undefined },
+                { name: 'gender', placeholder: '[GENDER]', value: undefined },
+                { name: 'genre_id', placeholder: '[GENRE_ID]', value: undefined },
+                { name: 'ifa_type', placeholder: '[IFA_TYPE]', value: undefined },
+                { name: 'iris_context', placeholder: '[IRIS_CONTEXT]', value: undefined },
+                { name: 'iris_id', placeholder: '[IRIS_ID]', value: undefined },
+                { name: 'livestream', placeholder: '[LIVESTREAM]', value: undefined },
+                { name: 'max_bitrate', placeholder: '[MAXBITRATE]', value: undefined },
+                { name: 'min_bitrate', placeholder: '[MINBITRATE]', value: undefined },
+                { name: 'partner_domain', placeholder: '[PARTNER_DOMAIN]', value: undefined },
+                { name: 'position', placeholder: '[POSITION]', value: undefined },
+                { name: 'preferred_language', placeholder: '[PREFERRED_LANGUAGE]', value: undefined },
+                { name: 'rights_holder', placeholder: '[RIGHTS_HOLDER]', value: undefined },
+                { name: 'ssai_enabled', placeholder: '[SSAI_ENABLED]', value: undefined },
+                { name: 'ssai_vendor', placeholder: '[SSAI_VENDOR]', value: undefined },
+                { name: 'session_id', placeholder: '[SESSION_ID]', value: sessionId },
+                { name: 'schain', placeholder: '[SCHAIN]', value: undefined },
+                { name: 'yob', placeholder: '[YOB]', value: undefined },
+            ];
+
+            // Build the VAST URL
+            let vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?';
+
+            // Build the query string with custom encoding
+            const queryParams = parameters.map(param => {
+                const value = (param.value !== undefined && param.value !== null) ? param.value : param.placeholder;
+                const encodedName = encodeURIComponent(param.name);
+                const encodedValue = customEncode(value);
+                return `${encodedName}=${encodedValue}`;
+            });
+
+            vastUrl += queryParams.join('&');
+
+            console.log("VAST URL:", vastUrl); // For debugging purposes
+
+            // Configure the AdsRequest
+            const adsRequest = new google.ima.AdsRequest();
+            adsRequest.adTagUrl = vastUrl;
+
+            // Set ad slot sizes
+            adsRequest.linearAdSlotWidth = player.el().offsetWidth;
+            adsRequest.linearAdSlotHeight = player.el().offsetHeight;
+            adsRequest.nonLinearAdSlotWidth = player.el().offsetWidth;
+            adsRequest.nonLinearAdSlotHeight = player.el().offsetHeight;
+
+            // Make the ad request
+            adsLoader.requestAds(adsRequest);
+        }
+
+        // Utility function to determine Operating System
         function getOS() {
             const userAgent = navigator.userAgent || navigator.vendor || window.opera;
             if (/windows phone/i.test(userAgent)) {
@@ -295,6 +660,7 @@
             return "Unknown";
         }
 
+        // Utility function to determine Browser
         function getBrowser() {
             const userAgent = navigator.userAgent;
             if (userAgent.indexOf("Firefox") > -1) {
@@ -315,225 +681,144 @@
             return "Unknown";
         }
 
-        async function getAdTagUrl() {
-            const timestamp = Date.now();
-            const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
-
-            const currentIP = await getCurrentIP(true); // Changed to true to use random IP
-
-            // Gather additional dynamic data
-            const episodeName = "{{ episode.name }}";
-            const showName = "{{ show.name }}";
-            const episodeId = "{{ episode.id }}"; // Assuming you have an episode ID
-            const showId = "{{ show.id }}"; // Assuming you have a show ID
-            const referrer = document.referrer || 'direct';
-            const pageURL = window.location.href;
-            const contentGenre = "{{ episode.genre }}"; // Assuming genre is available
-            const userAgent = navigator.userAgent;
-            const language = navigator.language || 'en';
-
-            // Device Information
-            const screenWidth = window.screen.width;
-            const screenHeight = window.screen.height;
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-            const deviceType = isMobile() ? 'mobile' : 'desktop';
-            const os = getOS();
-            const browser = getBrowser();
-            const sitePage = window.location.href;
-            // Content Length in seconds
-            const contentLength = Math.floor(player.duration()) || 0;
-
-            // Define the parameters in order
-            const parameters = [
-                { name: 'site_id', placeholder: '49382', value: '49382' },
-                { name: 'site_page', placeholder: '[SITE_PAGE]', value: sitePage },
-                { name: 'format', placeholder: 'vast', value: 'vast' },
-                { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '60' },
-                { name: 'cb', placeholder: '[CACHEBUSTER]', value: cacheBuster },
-                { name: 'ip', placeholder: '[IP]', value: currentIP },
-                { name: 'ua', placeholder: '[UA]', value: userAgent },
-                { name: 'player_height', placeholder: '[HEIGHT]', value: player.el().offsetHeight },
-                { name: 'player_width', placeholder: '[WIDTH]', value: player.el().offsetWidth },
-                { name: 'is_lat', placeholder: '[LIMITED_AD_TRACKING]', value: 'false' },
-                { name: 'site_name', placeholder: '[CHANNEL_NAME]', value: 'JLTV' },
-                { name: 'content_cat', placeholder: '[CONTENT_CAT]', value: 'Faith' },
-                { name: 'device_type', placeholder: '[DEVICE_TYPE]', value: deviceType },
-                { name: 'session_id', placeholder: '[SESSION_ID]', value: generateSessionId() },
-            ];
-
-            // Build the VAST URL
-            let vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?';
-
-            // Build the query string with custom encoding
-            const queryParams = parameters.map(param => {
-                const value = (param.value !== undefined && param.value !== null) ? param.value : param.placeholder;
-                const encodedName = encodeURIComponent(param.name);
-                const encodedValue = customEncode(value);
-                return `${encodedName}=${encodedValue}`;
-            });
-
-            vastUrl += queryParams.join('&');
-
-            console.log("VAST URL:", vastUrl); // For debugging purposes
-
-            return vastUrl;
-        }
-
-        async function initializePlayer() {
-            disposePlayer();
-
-            let isMobileDevice = isMobile();
-
-            player = videojs('my-video', {
-                autoplay: !isMobileDevice,
-                muted: !isMobileDevice,
-                controls: true,
-                playsinline: true,
-                preload: 'auto',
-                fullscreen: {
-                    enabled: false,
-                    iosNative: false
-                }
-            });
-
-            const episodeNameOverlay = document.getElementById('episode-name');
-            const episodeNameH2 = episodeNameOverlay.querySelector('h2');
-            episodeNameH2.textContent = "{{ episode.name }}";
-
-            player.ready(async function() {
-                const adTagUrl = await getAdTagUrl();
-                player.ima({
-                    adTagUrl: adTagUrl,
-                    debug: false, // Set to true for debugging
-                    id: 'my-video',
-                    adLabel: 'Advertisement',
-                    // Additional options if needed
-                });
-
-                // Handle ad events with correct event names
-                player.on('adsready', function() {
-                    console.log('Ads ready');
-                    // Optionally, you can show the spinner here if needed
-                });
-
-                player.on('adstart', function() {
-                    console.log('Ad started');
-                    adPlaying = true;
-                    hideSpinner(); // Hide spinner when ad starts
-                    player.el().style.pointerEvents = 'none';
-                    player.controls(false);
-                });
-
-                player.on('adend', function() {
-                    console.log('Ad ended');
-                    adPlaying = false;
-                    hideSpinner(); // Hide spinner when ad ends
-                    player.el().style.pointerEvents = 'auto';
-                    player.controls(true);
-                });
-
-                player.on('adskip', function() {
-                    console.log('Ad skipped');
-                    adPlaying = false;
-                    hideSpinner(); // Hide spinner when ad is skipped
-                    player.el().style.pointerEvents = 'auto';
-                    player.controls(true);
-                });
-
-                player.on('aderror', function() {
-                    console.log('Ad error');
-                    adPlaying = false;
-                    hideSpinner(); // Hide spinner on ad error
-                    player.el().style.pointerEvents = 'auto';
-                    player.controls(true);
-                });
-
-                // Handle play and pause events
-                player.on('play', function() {
-                    showEpisodeName();
-                    setTimeout(hideEpisodeName, 3000);
-                });
-
-                player.on('pause', hideEpisodeName);
-
-                player.on('ended', function() {
-                    console.log('Video ended');
-                    // Optionally play a post-roll ad
-                    player.ima.playAdBreak();
-                });
-
-                // Handle time-based ad requests
-                player.on('timeupdate', handleTimeUpdate);
-                player.on('seeking', handleSeeking);
-
-                // Hide the big play button on mobile devices when play starts
-                if (isMobileDevice) {
-                    player.on('play', function() {
-                        const videoContainer = document.getElementById('video-container');
-                        if (videoContainer) {
-                            videoContainer.classList.add('hide-big-play-button');
-                        }
-                    });
-                }
-
-                // Custom Fullscreen Button
-                addCustomFullscreenButton();
-
-                // Handle fullscreen changes to ensure ads play correctly
-                document.addEventListener('fullscreenchange', handleDocumentFullscreenChange);
-                document.addEventListener('fullscreenerror', handleFullscreenError);
-            });
-
-            // Add event listeners for mouse and touch interactions
-            player.el().addEventListener('mousemove', handleMouseMove);
-            player.el().addEventListener('mouseenter', handleMouseEnter);
-            player.el().addEventListener('mouseleave', handleMouseLeave);
-            player.el().addEventListener('touchstart', handleTouch);
-            player.el().addEventListener('touchmove', handleTouch);
-            player.el().addEventListener('touchend', handleTouch);
-        }
-
-        function disposePlayer() {
-            if (player) {
-                player.off('timeupdate', handleTimeUpdate);
-                player.off('seeking', handleSeeking);
-                player.off('play');
-                player.off('pause');
-                player.off('ended');
-                player.dispose();
-                player = null;
+        function processAdQueue() {
+            while (adRequestQueue.length > 0) {
+                adRequestQueue.shift();
+                requestAds();
             }
         }
 
+        function onAdsManagerLoaded(adsManagerLoadedEvent) {
+            adsManager = adsManagerLoadedEvent.getAdsManager(player.el());
+            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
+            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
+            adsManager.addEventListener(google.ima.AdEvent.Type.AD_ERROR, onAdError);
+            adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, onAllAdsCompleted);
+            adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdEnded);
+            adsManager.addEventListener(google.ima.AdEvent.Type.AD_STARTED, onAdStarted); // Added AD_STARTED listener
+            adsManager.addEventListener(google.ima.AdEvent.Type.AD_IMPRESSION, onAdImpression); // Added AD_IMPRESSION listener
+
+            try {
+                adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
+                adsManager.start();
+                // Do not hide spinner here; manage spinner visibility based on ad loading state
+            } catch (adError) {
+                console.error('AdsManager could not be started:', adError);
+                onAdError(); // Call onAdError to handle retry logic
+            }
+        }
+
+        function onAdStarted(adEvent) {
+            console.log('Ad started:', adEvent);
+            hideSpinner(); // Hide spinner when ad starts playing
+        }
+
+        function onAdImpression(adEvent) {
+            console.log('Ad impression:', adEvent);
+            hideSpinner(); // Hide spinner when ad impression occurs
+        }
+
+        function onAdEnded(adEvent) {
+            console.log('Ad ended:', adEvent);
+            if (adPlayed) {
+                adContainer.style.display = 'none';
+            }
+            player.el().style.pointerEvents = 'auto';
+            player.controls(true);
+            hideSpinner(); // Hide spinner when ad ends
+            retryCount = 0; // Reset retry count after a successful ad play
+            adRequestInProgress = false; // Reset the ad request flag
+        }
+
+        function onContentPauseRequested(adEvent) {
+            console.log('Content pause requested:', adEvent);
+            player.pause();
+            player.controls(false);
+            player.el().style.pointerEvents = 'none';
+            adContainer.style.display = 'block';
+            adPlaying = true;
+            hideSpinner(); // Hide spinner when ad is about to play
+        }
+
+        function onContentResumeRequested(adEvent) {
+            console.log('Content resume requested:', adEvent);
+            player.removeClass('vjs-controls-hidden');
+            player.muted(false);
+            player.controls(true);
+            player.el().style.pointerEvents = 'auto';
+            adContainer.style.display = 'none';
+            adPlaying = false;
+            if (savedTime !== undefined) {
+                player.currentTime(savedTime);
+                savedTime = undefined;
+            }
+            player.play();
+            hideSpinner(); // Hide spinner when content resumes
+        }
+
+        function onAdError(adErrorEvent) {
+            if (adErrorEvent) {
+                console.error('Ad error:', adErrorEvent.getError());
+            }
+
+            if (adsManager) {
+                adsManager.destroy();
+                adsManager = null;
+            }
+
+            if (retryCount < MAX_RETRIES) {
+                retryCount++;
+                console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
+                // Do not hide the spinner here to prevent flicker
+                adRequestInProgress = false; // Reset the ad request flag to allow retry
+
+                // Implementing a delay before retrying (exponential backoff)
+                setTimeout(() => {
+                    requestAds();
+                }, 0 * retryCount); // 1s, 2s, 3s, etc.
+            } else {
+                console.error('Max ad retries reached. Proceeding without ads.');
+                adPlaying = false;
+                hideSpinner(); // Hide spinner when max retries reached
+                retryCount = 0; // Reset retry count
+                adRequestInProgress = false; // Reset the ad request flag
+                player.play();
+            }
+        }
+
+        function onAllAdsCompleted(adEvent) {
+            console.log('All ads completed:', adEvent);
+            adPlaying = false;
+            player.removeClass('vjs-controls-hidden');
+            if (!videoEnded) { // Only play if video hasn't ended
+                player.play();
+            }
+            hideSpinner(); // Hide spinner when all ads are completed
+            retryCount = 0; // Reset retry count after ads complete
+            adRequestInProgress = false; // Reset the ad request flag
+        }
+
         function handleTimeUpdate() {
-            if (adPlaying) {
+            if (adPlaying || videoEnded) {
                 return;
             }
             const currentTime = player.currentTime();
             scteMarkers.forEach((marker, index) => {
+                // Exclude markers at time=0 to prevent duplicate preroll ads
                 if (marker.time > 0 && currentTime >= marker.time && index > lastPlayedCuePoint && !adPlaying) {
                     adPlaying = true;
                     lastPlayedCuePoint = index;
-                    player.ima.requestAds();
-                    showSpinner(); // Show spinner when requesting ads
-
-                    // Implement a fallback timeout in case ad events are not fired
-                    clearTimeout(adTimeout);
-                    adTimeout = setTimeout(() => {
-                        if (adPlaying) {
-                            console.warn('Ad request timed out. Hiding spinner and restoring controls.');
-                            adPlaying = false;
-                            hideSpinner();
-                            player.el().style.pointerEvents = 'auto';
-                            player.controls(true);
-                        }
-                    }, 10000); // 10 seconds timeout
+                    player.pause();
+                    showSpinner(); // Show spinner when requesting mid-roll ads
+                    requestAds();
                 }
             });
         }
 
         function handleSeeking() {
+            if (videoEnded) {
+                return;
+            }
             const currentTime = player.currentTime();
             const bufferTime = 0.5;
 
@@ -542,59 +827,30 @@
 
             const nextCuePoint = scteMarkers[lastPlayedCuePoint + 1];
             if (nextCuePoint && currentTime >= nextCuePoint.time - bufferTime && !adPlaying) {
+                player.pause();
                 adPlaying = true;
-                player.ima.requestAds();
+                savedTime = currentTime;
                 showSpinner(); // Show spinner when requesting ads due to seeking
-
-                // Implement a fallback timeout in case ad events are not fired
-                clearTimeout(adTimeout);
-                adTimeout = setTimeout(() => {
-                    if (adPlaying) {
-                        console.warn('Ad request timed out. Hiding spinner and restoring controls.');
-                        adPlaying = false;
-                        hideSpinner();
-                        player.el().style.pointerEvents = 'auto';
-                        player.controls(true);
-                    }
-                }, 10000); // 10 seconds timeout
+                requestAds();
             }
         }
 
-        function handleMouseMove() {
-            showEpisodeName();
-            resetMouseTimer();
-        }
+        window.addEventListener('resize', function() {
+            if (adsManager) {
+                const viewMode = player.isFullscreen() ? google.ima.ViewMode.FULLSCREEN : google.ima.ViewMode.NORMAL;
+                adsManager.resize(player.el().offsetWidth, player.el().offsetHeight, viewMode);
+            }
+        });
 
-        function handleMouseEnter() {
-            showEpisodeName();
-            resetMouseTimer();
-        }
+        window.addEventListener('beforeunload', function() {
+            adRequestQueue.length = 0;
+            lastPlayedCuePoint = -1;
+            sessionId = generateSessionId();
 
-        function handleMouseLeave() {
-            hideEpisodeName();
-            clearTimeout(mouseTimer);
-        }
-
-        function resetMouseTimer() {
-            clearTimeout(mouseTimer);
-            mouseTimer = setTimeout(() => {
-                hideEpisodeName();
-            }, 2000);
-        }
-
-        function goBack() {
-            window.history.back();
-        }
-
-        function showEpisodeName() {
-            const episodeNameOverlay = document.getElementById('episode-name');
-            episodeNameOverlay.style.opacity = '1';
-        }
-
-        function hideEpisodeName() {
-            const episodeNameOverlay = document.getElementById('episode-name');
-            episodeNameOverlay.style.opacity = '0';
-        }
+            // Dispose player and ads to clean up
+            disposePlayer();
+            destroyAds();
+        });
 
         function handleTouch() {
             showEpisodeName();
@@ -621,82 +877,9 @@
             if (videoPlayer) {
                 videoPlayer.classList.remove('hide-videojs-spinner');
             }
-            clearTimeout(adTimeout); // Clear any existing ad timeout
         }
 
-        function addCustomFullscreenButton() {
-            const controlBar = player.getChild('controlBar');
-            const fullscreenButton = document.createElement('button');
-            fullscreenButton.className = 'vjs-fullscreen-control vjs-control vjs-button';
-            fullscreenButton.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
-            fullscreenButton.setAttribute('aria-label', 'Fullscreen');
-
-            fullscreenButton.addEventListener('click', function() {
-                toggleFullscreen();
-            });
-
-            controlBar.el().insertBefore(fullscreenButton, controlBar.el().firstChild);
-        }
-
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                requestFullscreen(document.documentElement);
-            } else {
-                exitFullscreen();
-            }
-        }
-
-        function requestFullscreen(element) {
-            if (element.requestFullscreen) {
-                element.requestFullscreen({ navigationUI: 'auto' })
-                    .then(() => {
-                        console.log('Fullscreen mode entered');
-                    })
-                    .catch((err) => {
-                        console.error(`Error attempting to enable fullscreen mode: ${err.message}`);
-                    });
-            } else if (element.webkitRequestFullscreen) { /* Safari */
-                element.webkitRequestFullscreen();
-            } else if (element.msRequestFullscreen) { /* IE11 */
-                element.msRequestFullscreen();
-            }
-        }
-
-        function exitFullscreen() {
-            if (document.exitFullscreen) {
-                document.exitFullscreen()
-                    .then(() => {
-                        console.log('Fullscreen mode exited');
-                    })
-                    .catch((err) => {
-                        console.error(`Error attempting to exit fullscreen mode: ${err.message}`);
-                    });
-            } else if (document.webkitExitFullscreen) { /* Safari */
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) { /* IE11 */
-                document.msExitFullscreen();
-            }
-        }
-
-        function handleDocumentFullscreenChange() {
-            const isFullscreen = !!document.fullscreenElement;
-
-            if (player) {
-                if (isFullscreen) {
-                    player.addClass('vjs-fullscreen');
-                } else {
-                    player.removeClass('vjs-fullscreen');
-                }
-            }
-        }
-
-        function handleFullscreenError() {
-            console.error('An error occurred while attempting to change fullscreen mode.');
-        }
-
-        document.addEventListener('DOMContentLoaded', async function() {
-            await initializePlayer();
-        });
+        initializePlayer();
     </script>
 </body>
 </html>
