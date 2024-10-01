@@ -43,21 +43,35 @@ class Show(db.Model):
 class Season(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     number = db.Column(db.Integer, nullable=False)
-    show_id = db.Column(db.Integer, db.ForeignKey('show.id'), nullable=False)
+    show_id = db.Column(db.String(36), db.ForeignKey('show.id'), nullable=False)
     episodes = db.relationship('Episode', backref='season', cascade='all, delete-orphan')
 
 
 class Episode(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    number = db.Column(db.Integer) 
+    number = db.Column(db.Integer, nullable=False)
     url = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
     short_description = db.Column(db.String(200), nullable=True)
     keywords = db.Column(db.String(200), nullable=True)
     category = db.Column(db.String(100), nullable=True)
     thumbnail_url = db.Column(db.String(200), nullable=True)
-    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
+    season_id = db.Column(db.String(36), db.ForeignKey('season.id'), nullable=False)
+    next_episode_id = db.Column(db.String(36), db.ForeignKey('episode.id'), nullable=True)
+    next_episode = db.relationship('Episode', remote_side=[id], uselist=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'url': self.url,
+            'category': self.category,
+            'thumbnail_url': self.thumbnail_url,
+            'season_id': self.season_id,
+            'next_episode_id': self.next_episode_id
+        }
 
 
 

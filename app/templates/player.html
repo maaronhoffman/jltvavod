@@ -14,12 +14,15 @@
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <style>
+        /* Existing styles... */
+
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
+            background-color: #000; /* Ensure background is black */
         }
         #video-container {
             position: absolute;
@@ -160,7 +163,7 @@
 
         .spinner {
             border: 5px solid rgba(255, 255, 255, 0.3); /* Light grey with transparency */
-            border-top: 5px solid rgb(15, 169, 231); /* White border-top */
+            border-top: 5px solid rgb(15, 169, 231); /* Blue border-top */
             border-radius: 50%;
             width: 50px; /* Match Video.js spinner size */
             height: 50px; /* Match Video.js spinner size */
@@ -170,6 +173,35 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        /* Next Episode Overlay Styles */
+        #next-episode-overlay {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 250px;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
+            padding: 15px;
+            border-radius: 10px;
+            display: none; /* Hidden by default */
+            z-index: 1003; /* Above all other elements */
+            color: #fff;
+        }
+
+        #next-episode-overlay img {
+            width: 100%;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        #next-episode-overlay .next-episode-title {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        #next-episode-overlay .countdown {
+            font-size: 16px;
         }
     </style>
 </head>
@@ -192,11 +224,17 @@
         <div id="spinner">
             <div class="spinner"></div>
         </div>
+        <!-- Next Episode Overlay -->
+        <div id="next-episode-overlay">
+            <img id="next-episode-thumbnail" src="" alt="Next Episode Thumbnail">
+            <div class="next-episode-title" id="next-episode-title">Next Episode: </div>
+            <div class="countdown">Play Next Episode in <span id="countdown-timer">15</span>s</div>
+        </div>
     </div>
     
     <script>
         const IMA_SDK_URL = 'https://imasdk.googleapis.com/js/sdkloader/ima3.js';
-        const MAX_RETRIES = 1; // Maximum number of retries
+        const MAX_RETRIES = 3; // Increased retries for better coverage
         let adPlayed = false;
         let player, adContainer, adPlaying, scteMarkers, adsManager, adsLoader, lastPlayedCuePoint;
         let imaSDKLoaded = false;
@@ -209,6 +247,10 @@
         let retryCount = 0; // Initialize retry counter
         let adDisplayContainer;
         let adRequestInProgress = false; // Flag to prevent multiple ad requests
+
+        // Parse next_episode data from Flask
+        const nextEpisode = {{ next_episode | tojson }};
+        let countdownInterval;
 
         function generateSessionId() {
             return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -350,7 +392,6 @@
               }, 2000);
           }
         
-
         function goBack() {
             window.history.back();
         }
@@ -472,7 +513,7 @@
             const showId = "{{ show.id }}"; // Assuming you have a show ID
             const referrer = document.referrer || 'direct';
             const pageURL = window.location.href;
-            const contentGenre = "{{ episode.genre }}"; // Assuming genre is available
+            const contentGenre = "{{ episode.category }}"; // Assuming category is available
             const userAgent = navigator.userAgent;
             const language = navigator.language || 'en';
 
@@ -493,15 +534,15 @@
                 { name: 'site_id', placeholder: '49382', value: '49382' },
                 { name: 'site_page', placeholder: '[SITE_PAGE]', value: sitePage },
                 { name: 'format', placeholder: 'vast', value: 'vast' },
-                { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '60' },
+                { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '300' },
                 { name: 'cb', placeholder: '[CACHEBUSTER]', value: cacheBuster },
                 { name: 'ip', placeholder: '[IP]', value: currentIP },
-                { name: 'ua', placeholder: '[UA]', value: undefined },
+                { name: 'ua', placeholder: '[UA]', value: userAgent },
                 { name: 'player_height', placeholder: '[HEIGHT]', value: player.el().offsetHeight },
                 { name: 'player_width', placeholder: '[WIDTH]', value: player.el().offsetWidth },
-                { name: 'is_lat', placeholder: '[LIMITED_AD_TRACKING]', value: 'false' },
+                { name: 'is_lat', placeholder: '[LIMITED_AD_TRACKING]', value: '0' },
                 { name: 'site_name', placeholder: '[CHANNEL_NAME]', value: 'JLTV' },
-                { name: 'content_cat', placeholder: '[CONTENT_CAT]', value: undefined },
+                { name: 'content_cat', placeholder: '[CONTENT_CAT]', value: contentGenre },
                 { name: 'content_channel', placeholder: '[CONTENT_CHANNEL]', value: undefined },
                 { name: 'content_context', placeholder: '[CONTENT_CONTEXT]', value: undefined },
                 { name: 'content_dist_id', placeholder: '[CONTENT_DIST_ID]', value: undefined },
@@ -509,7 +550,7 @@
                 { name: 'content_episode', placeholder: '[CONTENT_EPISODE]', value: undefined },
                 { name: 'content_genre', placeholder: '[CONTENT_GENRE]', value: contentGenre },
                 { name: 'content_id', placeholder: '[CONTENT_ID]', value: episodeId },
-                { name: 'content_keywords', placeholder: '[CONTENT_KEYWORDS]', value: undefined },
+                { name: 'content_keywords', placeholder: '[CONTENT_KEYWORDS]', value: "{{ episode.keywords }}" },
                 { name: 'content_language', placeholder: '[CONTENT_LANGUAGE]', value: language },
                 { name: 'content_length', placeholder: '[CONTENT_LENGTH]', value: contentLength },
                 { name: 'content_network', placeholder: '[CONTENT_NETWORK]', value: undefined },
@@ -517,10 +558,10 @@
                 { name: 'content_producer_id', placeholder: '[CONTENT_PRODUCER_ID]', value: undefined },
                 { name: 'content_producer', placeholder: '[CONTENT_PRODUCER_NAME]', value: undefined },
                 { name: 'content_rating', placeholder: '[CONTENT_RATING]', value: undefined },
-                { name: 'content_season', placeholder: '[CONTENT_SEASON]', value: undefined },
+                { name: 'content_season', placeholder: '[CONTENT_SEASON]', value: "{{ episode.season.number }}" },
                 { name: 'content_series', placeholder: '[CONTENT_SERIES]', value: showName },
                 { name: 'content_title', placeholder: '[CONTENT_TITLE]', value: episodeName },
-                { name: 'content_url', placeholder: '[CONTENT_URL]', value: undefined },
+                { name: 'content_url', placeholder: '[CONTENT_URL]', value: sitePage },
                 { name: 'buyeruid', placeholder: '[BUYERUID]', value: undefined },
                 { name: 'us_privacy', placeholder: '[US_PRIVACY]', value: undefined },
                 { name: 'consent', placeholder: '[CONSENT]', value: undefined },
@@ -539,12 +580,12 @@
                 { name: 'custom_16', placeholder: '[CUSTOM_16]', value: undefined },
                 { name: 'custom_17', placeholder: '[CUSTOM_17]', value: undefined },
                 { name: 'custom_18', placeholder: '[CUSTOM_18]', value: undefined },
-                { name: 'device_language', placeholder: '[DEVICE_LANGUAGE]', value: undefined },
+                { name: 'device_language', placeholder: '[DEVICE_LANGUAGE]', value: language },
                 { name: 'lat', placeholder: '[LAT]', value: undefined },
                 { name: 'lon', placeholder: '[LON]', value: undefined },
                 { name: 'device_type', placeholder: '[DEVICE_TYPE]', value: deviceType },
                 { name: 'gdpr', placeholder: '[GDPR]', value: undefined },
-                { name: 'gender', placeholder: '[GENDER]', value: undefined },
+                { name: 'gender', placeholder: '[GENDER]', value: 'male' },
                 { name: 'genre_id', placeholder: '[GENRE_ID]', value: undefined },
                 { name: 'ifa_type', placeholder: '[IFA_TYPE]', value: undefined },
                 { name: 'iris_context', placeholder: '[IRIS_CONTEXT]', value: undefined },
@@ -554,7 +595,7 @@
                 { name: 'min_bitrate', placeholder: '[MINBITRATE]', value: undefined },
                 { name: 'partner_domain', placeholder: '[PARTNER_DOMAIN]', value: undefined },
                 { name: 'position', placeholder: '[POSITION]', value: undefined },
-                { name: 'preferred_language', placeholder: '[PREFERRED_LANGUAGE]', value: undefined },
+                { name: 'preferred_language', placeholder: '[PREFERRED_LANGUAGE]', value: 'en' },
                 { name: 'rights_holder', placeholder: '[RIGHTS_HOLDER]', value: undefined },
                 { name: 'ssai_enabled', placeholder: '[SSAI_ENABLED]', value: undefined },
                 { name: 'ssai_vendor', placeholder: '[SSAI_VENDOR]', value: undefined },
@@ -656,6 +697,7 @@
                 adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
                 adsManager.start();
                 hideSpinner(); // Hide spinner after adsManager starts successfully
+                console.log("AdsManager initialized and started successfully");
             } catch (adError) {
                 console.error('AdsManager could not be started:', adError);
                 onAdError(); // Call onAdError to handle retry logic
@@ -671,6 +713,7 @@
             hideSpinner(); // Hide spinner when ad ends
             retryCount = 0; // Reset retry count after a successful ad play
             adRequestInProgress = false; // Reset the ad request flag
+            console.log("Ad ended successfully");
         }
 
         function onContentPauseRequested() {
@@ -680,6 +723,7 @@
             adContainer.style.display = 'block';
             adPlaying = true;
             hideSpinner(); // Hide spinner when ad is about to play
+            console.log("Content paused for ad");
         }
 
         function onContentResumeRequested() {
@@ -694,6 +738,7 @@
                 savedTime = undefined;
             }
             player.play();
+            console.log("Content resumed after ad");
         }
 
         function onAdError(adErrorEvent) {
@@ -709,14 +754,15 @@
             if (retryCount < MAX_RETRIES) {
                 retryCount++;
                 console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
-                hideSpinner(); // Hide spinner before retrying to prevent overlapping spinners
+                // Remove the hideSpinner() call here to keep the spinner visible during retries
+                // hideSpinner(); // Removed to keep spinner visible
+
                 adRequestInProgress = false; // Reset the ad request flag to allow retry
 
                 // Implementing a delay before retrying (optional but recommended)
                 setTimeout(() => {
-                    showSpinner(); // Show spinner when retrying
                     requestAds();
-                }, 0 * retryCount); // Exponential backoff: 1s, 2s, 3s, etc.
+                }, 1000 * retryCount); // Exponential backoff: 1s, 2s, etc.
             } else {
                 console.error('Max ad retries reached. Proceeding without ads.');
                 adPlaying = false;
@@ -734,6 +780,7 @@
             hideSpinner(); // Hide spinner when all ads are completed
             retryCount = 0; // Reset retry count after ads complete
             adRequestInProgress = false; // Reset the ad request flag
+            console.log("All ads completed successfully");
         }
 
         function handleTimeUpdate() {
@@ -741,6 +788,14 @@
                 return;
             }
             const currentTime = player.currentTime();
+            const duration = player.duration();
+            const bufferTime = 15; // seconds before the end to show the overlay
+
+            // Ensure duration is valid and greater than bufferTime
+            if (duration && (duration - currentTime <= bufferTime) && !nextEpisodeOverlayShown && nextEpisode) {
+                showNextEpisodeOverlay();
+            }
+
             scteMarkers.forEach((marker, index) => {
                 // Exclude markers at time=0 to prevent duplicate preroll ads
                 if (marker.time > 0 && currentTime >= marker.time && index > lastPlayedCuePoint && !adPlaying) {
@@ -749,8 +804,56 @@
                     player.pause();
                     showSpinner(); // Show spinner when requesting mid-roll ads
                     requestAds();
+                    console.log(`Mid-roll ad triggered at ${marker.time} seconds`);
                 }
             });
+        }
+
+        let nextEpisodeOverlayShown = false;
+        let countdownSeconds = 15; // Updated countdown to 15 seconds
+
+        function showNextEpisodeOverlay() {
+            if (nextEpisodeOverlayShown) return;
+            nextEpisodeOverlayShown = true;
+
+            const overlay = document.getElementById('next-episode-overlay');
+            const thumbnail = document.getElementById('next-episode-thumbnail');
+            const title = document.getElementById('next-episode-title');
+            const countdown = document.getElementById('countdown-timer');
+
+            if (nextEpisode) {
+                thumbnail.src = nextEpisode.thumbnail_url || "{{ url_for('static', filename='images/default_thumbnail.png') }}";
+                title.textContent = `Next Episode: ${nextEpisode.name}`;
+                countdownSeconds = 15; // Starting countdown seconds
+
+                countdown.textContent = `${countdownSeconds}`;
+                overlay.style.display = 'block';
+                console.log("Next Episode Overlay displayed");
+
+                countdownInterval = setInterval(() => {
+                    countdownSeconds--;
+                    if (countdownSeconds <= 0) {
+                        clearInterval(countdownInterval);
+                        playNextEpisode();
+                    } else {
+                        countdown.textContent = `${countdownSeconds}`;
+                    }
+                }, 1000);
+            } else {
+                console.warn("No next episode data available to display overlay");
+            }
+        }
+
+        function playNextEpisode() {
+            if (nextEpisode) {
+                const nextEpisodeId = nextEpisode.id;
+                const showId = "{{ show.id }}";
+                const nextPlayUrl = `/play/${nextEpisodeId}/${showId}`;
+                console.log(`Redirecting to next episode: ${nextPlayUrl}`);
+                window.location.href = nextPlayUrl;
+            } else {
+                console.warn("No next episode to play");
+            }
         }
 
         function handleSeeking() {
@@ -767,12 +870,14 @@
                 savedTime = currentTime;
                 showSpinner(); // Show spinner when requesting ads due to seeking
                 requestAds();
+                console.log(`Seeking triggered ad request at ${currentTime} seconds`);
             }
         }
 
         window.addEventListener('resize', function() {
             if (adsManager) {
                 adsManager.resize(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
+                console.log("AdsManager resized on window resize");
             }
         });
 
@@ -784,6 +889,7 @@
             // Dispose player and ads to clean up
             disposePlayer();
             destroyAds();
+            console.log("Player and ads disposed on page unload");
         });
 
         function handleTouch() {
@@ -800,6 +906,7 @@
             if (videoPlayer) {
                 videoPlayer.classList.add('hide-videojs-spinner');
             }
+            console.log("Spinner shown");
         }
 
         function hideSpinner() {
@@ -811,6 +918,7 @@
             if (videoPlayer) {
                 videoPlayer.classList.remove('hide-videojs-spinner');
             }
+            console.log("Spinner hidden");
         }
 
         initializePlayer();
