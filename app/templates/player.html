@@ -302,10 +302,15 @@
 
             player.ready(function() {
                 player.on('play', function() {
+                    console.log("Play event triggered");
                     if (!adDisplayContainerInitialized) {
                         if (adDisplayContainer && adDisplayContainer.initialize) {
                             adDisplayContainer.initialize();
                             adDisplayContainerInitialized = true;
+                            console.log("AdDisplayContainer initialized");
+                            processAdQueue(); // Process any queued ad requests
+                        } else {
+                            console.error("AdDisplayContainer or its initialize method is undefined");
                         }
                     }
                     if (!prerollRequested && scteMarkers.length > 0 && scteMarkers[0].time === 0) {
@@ -313,7 +318,11 @@
                         adPlaying = true;
                         player.pause();
                         showSpinner(); // Show spinner when requesting preroll ads
-                        requestAds();
+                        console.log("Requesting preroll ads");
+                        // Introduce a slight delay to ensure AdDisplayContainer is fully initialized
+                        setTimeout(() => {
+                            requestAds();
+                        }, 100); // 100ms delay
                         return;
                     }
                     if (adPlaying) {
@@ -392,6 +401,7 @@
               }, 2000);
           }
         
+
         function goBack() {
             window.history.back();
         }
@@ -408,6 +418,7 @@
         function loadIMASDK(callback) {
             if (typeof google !== 'undefined' && typeof google.ima !== 'undefined') {
                 imaSDKLoaded = true;
+                console.log("IMA SDK already loaded");
                 callback();
                 processAdQueue();
                 return;
@@ -417,6 +428,7 @@
             script.async = true;
             script.onload = () => {
                 imaSDKLoaded = true;
+                console.log("IMA SDK loaded successfully");
                 callback();
                 processAdQueue();
             };
@@ -435,6 +447,7 @@
             if (!adDisplayContainer) {
                 // Create the AdDisplayContainer if it hasn't been created yet
                 adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
+                console.log("AdDisplayContainer instance created");
             }
 
             if (!adsLoader) {
@@ -448,6 +461,7 @@
                     google.ima.AdErrorEvent.Type.AD_ERROR,
                     onAdError,
                     false);
+                console.log("AdsLoader initialized and event listeners added");
             }
         }
 
@@ -490,16 +504,19 @@
             }
 
             if (!imaSDKLoaded) {
+                console.warn("IMA SDK not loaded yet. Queuing ad request.");
                 adRequestQueue.push(true);
                 return;
             }
 
             if (!adDisplayContainerInitialized) {
-                console.warn("AdDisplayContainer not initialized yet");
+                console.warn("AdDisplayContainer not initialized yet. Queuing ad request.");
+                adRequestQueue.push(true);
                 return;
             }
 
             adRequestInProgress = true; // Set the flag to indicate ad request is in progress
+            console.log("Starting ad request");
 
             const timestamp = Date.now();
             const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
@@ -631,6 +648,7 @@
 
             // Make the ad request
             adsLoader.requestAds(adsRequest);
+            console.log("Ads requested");
         }
 
         // Utility function to determine Operating System
@@ -790,6 +808,8 @@
             const currentTime = player.currentTime();
             const duration = player.duration();
             const bufferTime = 15; // seconds before the end to show the overlay
+
+            console.log(`Current Time: ${currentTime}, Duration: ${duration}, Buffer Time: ${bufferTime}`);
 
             // Ensure duration is valid and greater than bufferTime
             if (duration && (duration - currentTime <= bufferTime) && !nextEpisodeOverlayShown && nextEpisode) {
