@@ -488,7 +488,8 @@
 
     // === Back Button Function ===
     function goBack() {
-        window.history.back();
+        const showId = "{{ show.id }}"; // Assuming you've passed the show ID to the template
+        window.location.href = `/show/${showId}`; // Adjust this URL to match your show-detail route
     }
 
     // === Next Episode Overlay Control ===
