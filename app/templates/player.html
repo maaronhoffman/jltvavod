@@ -328,7 +328,8 @@
     }
 
     function isMobile() {
-        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const ua = navigator.userAgent || navigator.vendor || window.opera;
+        return /android|iphone|ipad|ipod|opera mini|iemobile|mobile/i.test(ua.toLowerCase());
     }
 
     function getOS() {
@@ -389,7 +390,7 @@
         if (useRandom) {
             return getRandomPublicIP();
         }
-        
+
         try {
             const response = await fetch('https://api.ipify.org?format=json');
             const data = await response.json();
@@ -488,8 +489,7 @@
 
     // === Back Button Function ===
     function goBack() {
-        const showId = "{{ show.id }}"; // Assuming you've passed the show ID to the template
-        window.location.href = `/show/${showId}`; // Adjust this URL to match your show-detail route
+        window.history.back();
     }
 
     // === Next Episode Overlay Control ===
@@ -858,7 +858,7 @@
         const timestamp = Date.now();
         const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
 
-        const currentIP = await getCurrentIP(false); // Use actual IP instead of random
+        const currentIP = await getCurrentIP(true); // Use actual IP instead of random
 
         // Gather additional dynamic data
         const episodeName = "{{ episode.name }}";
@@ -1012,11 +1012,11 @@
         disposePlayer();
         destroyAds();
 
-        let isMobileDevice = isMobile();
+        let isMobileDevice = isMobile(); // Correctly detect mobile devices
 
         player = videojs('my-video', {
-            autoplay: !isMobileDevice, // On mobile devices, do not autoplay
-            muted: !isMobileDevice, // On mobile devices, do not mute
+            autoplay: isMobileDevice ? false : true, // Autoplay based on device
+            muted: isMobileDevice ? true : true,    // Ensure muted for autoplay compliance
             controls: true,
             playsinline: true,
             controlBar: {
