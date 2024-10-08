@@ -6,26 +6,26 @@
     <title>{{ show.name }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
-<script src="{{ url_for('static', filename='js/poster-glow.js') }}"></script>
-<script>
-    document.documentElement.style.setProperty('--theme-color', '{{ show.theme_color or "rgba(255, 255, 255, 0.5)" }}');
-   
+    <script src="{{ url_for('static', filename='js/poster-glow.js') }}"></script>
+    <script>
+        document.documentElement.style.setProperty('--theme-color', '{{ show.theme_color or "rgba(255, 255, 255, 0.5)" }}');
     
-    document.addEventListener('DOMContentLoaded', function() {
-        const themeColor = '{{ show.theme_color or "#FFFFFF" }}';
-        const rgb = hexToRgb(themeColor);
-        document.documentElement.style.setProperty('--theme-color-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
-    });
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeColor = '{{ show.theme_color or "#FFFFFF" }}';
+            const rgb = hexToRgb(themeColor);
+            document.documentElement.style.setProperty('--theme-color-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+        });
 
-    function hexToRgb(hex) {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : null;
-    }
-</script>
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+    </script>
 
 <style>
      .show-detail-banner-content {

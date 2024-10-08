@@ -4,7 +4,7 @@
     <!-- Metadata and stylesheets -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Player</title>
+    <title>Video Player with IMA Ads and Next Episode Feature</title>
     <!-- Video.js and HLS.js -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <link href="https://vjs.zencdn.net/7.10.2/video-js.min.css" rel="stylesheet">
@@ -131,7 +131,7 @@
             background-color: rgba(0, 0, 0, 0.8);
         }
     
-       /* Arrange show-info-header elements in a row */
+        /* Arrange show-info-header elements in a row */
         .show-info-header {
             display: flex;
             align-items: center;
@@ -232,26 +232,39 @@
         </div>
     </div>
     
+    <!-- IMA SDK Script -->
+    <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
+    
+    <!-- Initialize the Player and IMA SDK -->
     <script>
-        const IMA_SDK_URL = 'https://imasdk.googleapis.com/js/sdkloader/ima3.js';
-        const MAX_RETRIES = 3; // Increased retries for better coverage
+        // === Global Variables ===
+        const MAX_RETRIES = 3; // Maximum number of ad retries
         let adPlayed = false;
         let player, adContainer, adPlaying, scteMarkers, adsManager, adsLoader, lastPlayedCuePoint;
-        let imaSDKLoaded = false;
-        let mouseTimer;
-        const adRequestQueue = [];
-        let sessionId;
-        let savedTime;
-        let prerollRequested = false;
         let adDisplayContainerInitialized = false;
         let retryCount = 0; // Initialize retry counter
         let adDisplayContainer;
         let adRequestInProgress = false; // Flag to prevent multiple ad requests
+        let isPostroll = false;
+        let prerollRequested = false;
+        let postrollRequested = false;
+        let savedTime;
+        let sessionId;
+
+        // Initialize adRequestQueue globally
+        const adRequestQueue = [];
 
         // Parse next_episode data from Flask
         const nextEpisode = {{ next_episode | tojson }};
         let countdownInterval;
 
+        // === Separate Markers ===
+        let prerollMarker = null;
+        let postrollMarker = null;
+        let midrollMarkers = [];
+        let currentMidrollIndex = 0; // To track the next midroll ad
+
+        // === Utility Functions ===
         function generateSessionId() {
             return Date.now().toString(36) + Math.random().toString(36).substring(2);
         }
@@ -260,209 +273,47 @@
             return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
 
-        // Load the IMA SDK and initialize IMA
-        loadIMASDK(initIMA);
-
-        function initializePlayer() {
-            // Dispose of existing player and ads
-            disposePlayer();
-            destroyAds();
-            let isMobileDevice = isMobile();
-
-            player = videojs('my-video', {
-                autoplay: !isMobileDevice, // On mobile devices, do not autoplay
-                muted: !isMobileDevice, // On mobile devices, do not mute
-                controls: true,
-                playsinline: true,
-                fullscreen: {
-                    enabled: false
-                }
-            });
-
-            adContainer = document.getElementById('ad-container');
-            adContainer.style.display = 'none';
-            adPlaying = false;
-            adPlayed = false;
-            scteMarkers = {{ scte_markers|safe }};
-            lastPlayedCuePoint = -1;
-            sessionId = generateSessionId();
-            adRequestQueue.length = 0;
-            prerollRequested = false;
-            savedTime = undefined;
-            retryCount = 0;
-            adRequestInProgress = false; // Reset the ad request flag
-
-            player.on('timeupdate', handleTimeUpdate);
-            player.on('seeking', handleSeeking);
-
-            const episodeNameOverlay = document.getElementById('episode-name');
-            const episodeNameH2 = episodeNameOverlay.querySelector('h2');
-            episodeNameH2.textContent = "{{ episode.name }}";
-            // console.log("Set episode name:", episodeNameOverlay.textContent);
-
-            player.ready(function() {
-                player.on('play', function() {
-                    console.log("Play event triggered");
-                    if (!adDisplayContainerInitialized) {
-                        if (adDisplayContainer && adDisplayContainer.initialize) {
-                            adDisplayContainer.initialize();
-                            adDisplayContainerInitialized = true;
-                            console.log("AdDisplayContainer initialized");
-                            processAdQueue(); // Process any queued ad requests
-                        } else {
-                            console.error("AdDisplayContainer or its initialize method is undefined");
-                        }
-                    }
-                    if (!prerollRequested && scteMarkers.length > 0 && scteMarkers[0].time === 0) {
-                        prerollRequested = true;
-                        adPlaying = true;
-                        player.pause();
-                        showSpinner(); // Show spinner when requesting preroll ads
-                        console.log("Requesting preroll ads");
-                        // Introduce a slight delay to ensure AdDisplayContainer is fully initialized
-                        setTimeout(() => {
-                            requestAds();
-                        }, 100); // 100ms delay
-                        return;
-                    }
-                    if (adPlaying) {
-                        player.pause();
-                    }
-                    showEpisodeName();
-                    setTimeout(hideEpisodeName, 3000);
-                });
-            });
-            player.on('pause', hideEpisodeName);
-            player.on('ended', function() {
-                if (adsLoader) {
-                    adsLoader.contentComplete();
-                }
-            });
-            player.el().addEventListener('mousemove', handleMouseMove);
-            player.el().addEventListener('mouseenter', handleMouseEnter);
-            player.el().addEventListener('mouseleave', handleMouseLeave);
-            player.el().addEventListener('touchstart', handleTouch);
-            player.el().addEventListener('touchmove', handleTouch);
-            player.el().addEventListener('touchend', handleTouch);
-        }
-        // Function to dispose of the player
-        function disposePlayer() {
-            if (player) {
-                // Remove event listeners to prevent duplication
-                player.off('timeupdate', handleTimeUpdate);
-                player.off('seeking', handleSeeking);
-                player.off('play');
-                player.off('pause');
-                player.off('ended');
-
-                player.el().removeEventListener('mousemove', handleMouseMove);
-                player.el().removeEventListener('mouseenter', handleMouseEnter);
-                player.el().removeEventListener('mouseleave', handleMouseLeave);
-                player.el().removeEventListener('touchstart', handleTouch);
-                player.el().removeEventListener('touchmove', handleTouch);
-                player.el().removeEventListener('touchend', handleTouch);
-
-                player.dispose();
-                player = null;
+        function getOS() {
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            if (/windows phone/i.test(userAgent)) {
+                return "Windows Phone";
             }
-        }
-
-        // Function to destroy AdsManager (but not AdsLoader or AdDisplayContainer)
-        function destroyAds() {
-            if (adsManager) {
-                adsManager.destroy();
-                adsManager = null;
+            if (/android/i.test(userAgent)) {
+                return "Android";
             }
-            // Do not reset adDisplayContainerInitialized
-            // Do not destroy adsLoader or adDisplayContainer
-        }
-
-        function handleMouseMove() {
-            // console.log("Mouse moved");
-            showEpisodeName();
-            resetMouseTimer();
-        }
-
-        function handleMouseEnter() {
-            // console.log("Mouse entered");
-            showEpisodeName();
-            resetMouseTimer();
-        }
-
-        function handleMouseLeave() {
-            // console.log("Mouse left");
-            hideEpisodeName();
-            clearTimeout(mouseTimer);
-        }
-          function resetMouseTimer() {
-              clearTimeout(mouseTimer);
-              mouseTimer = setTimeout(() => {
-                  hideEpisodeName();
-              }, 2000);
-          }
-        
-
-        function goBack() {
-            window.history.back();
-        }
-        function showEpisodeName() {
-            const episodeNameOverlay = document.getElementById('episode-name');
-            episodeNameOverlay.style.opacity = '1';
-        }
-
-        function hideEpisodeName() {
-            const episodeNameOverlay = document.getElementById('episode-name');
-            episodeNameOverlay.style.opacity = '0';
-        }
-
-        function loadIMASDK(callback) {
-            if (typeof google !== 'undefined' && typeof google.ima !== 'undefined') {
-                imaSDKLoaded = true;
-                console.log("IMA SDK already loaded");
-                callback();
-                processAdQueue();
-                return;
+            if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+                return "iOS";
             }
-            const script = document.createElement('script');
-            script.src = IMA_SDK_URL;
-            script.async = true;
-            script.onload = () => {
-                imaSDKLoaded = true;
-                console.log("IMA SDK loaded successfully");
-                callback();
-                processAdQueue();
-            };
-            script.onerror = () => {
-                console.error("Failed to load IMA SDK");
-            };
-            document.head.appendChild(script);
+            if (/Win/i.test(userAgent)) {
+                return "Windows";
+            }
+            if (/Mac/i.test(userAgent)) {
+                return "MacOS";
+            }
+            if (/Linux/i.test(userAgent)) {
+                return "Linux";
+            }
+            return "Unknown";
         }
 
-        function initIMA() {
-            if (typeof google === 'undefined' || typeof google.ima === 'undefined') {
-                console.error("Google IMA SDK not loaded properly.");
-                return;
+        function getBrowser() {
+            const userAgent = navigator.userAgent;
+            if (userAgent.indexOf("Firefox") > -1) {
+                return "Firefox";
+            } else if (userAgent.indexOf("SamsungBrowser") > -1) {
+                return "Samsung Internet";
+            } else if (userAgent.indexOf("Opera") > -1 || userAgent.indexOf("OPR") > -1) {
+                return "Opera";
+            } else if (userAgent.indexOf("Trident") > -1) {
+                return "Internet Explorer";
+            } else if (userAgent.indexOf("Edge") > -1) {
+                return "Edge";
+            } else if (userAgent.indexOf("Chrome") > -1) {
+                return "Chrome";
+            } else if (userAgent.indexOf("Safari") > -1) {
+                return "Safari";
             }
-
-            if (!adDisplayContainer) {
-                // Create the AdDisplayContainer if it hasn't been created yet
-                adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
-                console.log("AdDisplayContainer instance created");
-            }
-
-            if (!adsLoader) {
-                // Create AdsLoader if it hasn't been created yet
-                adsLoader = new google.ima.AdsLoader(adDisplayContainer);
-                adsLoader.addEventListener(
-                    google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-                    onAdsManagerLoaded,
-                    false);
-                adsLoader.addEventListener(
-                    google.ima.AdErrorEvent.Type.AD_ERROR,
-                    onAdError,
-                    false);
-                console.log("AdsLoader initialized and event listeners added");
-            }
+            return "Unknown";
         }
 
         function getRandomPublicIP() {
@@ -497,31 +348,307 @@
                 .replace(/%5D/g, ']');
         }
 
-        async function requestAds() {
+        // === Spinner Control ===
+        function showSpinner() {
+            const spinner = document.getElementById('spinner');
+            if (spinner) {
+                spinner.style.display = 'block';
+            }
+            const videoPlayer = document.querySelector('.video-js');
+            if (videoPlayer) {
+                videoPlayer.classList.add('hide-videojs-spinner');
+            }
+            console.log("Spinner shown");
+        }
+
+        function hideSpinner() {
+            const spinner = document.getElementById('spinner');
+            if (spinner) {
+                spinner.style.display = 'none';
+            }
+            const videoPlayer = document.querySelector('.video-js');
+            if (videoPlayer) {
+                videoPlayer.classList.remove('hide-videojs-spinner');
+            }
+            console.log("Spinner hidden");
+        }
+
+        // === Episode Name Overlay Control ===
+        let mouseTimer;
+
+        function handleMouseMove() {
+            showEpisodeName();
+            resetMouseTimer();
+        }
+
+        function handleMouseEnter() {
+            showEpisodeName();
+            resetMouseTimer();
+        }
+
+        function handleMouseLeave() {
+            hideEpisodeName();
+            clearTimeout(mouseTimer);
+        }
+
+        function resetMouseTimer() {
+            clearTimeout(mouseTimer);
+            mouseTimer = setTimeout(() => {
+                hideEpisodeName();
+            }, 2000);
+        }
+
+        function handleTouch() {
+            showEpisodeName();
+            resetMouseTimer();
+        }
+
+        function showEpisodeName() {
+            const episodeNameOverlay = document.getElementById('episode-name');
+            if (episodeNameOverlay) {
+                episodeNameOverlay.style.opacity = '1';
+            }
+        }
+
+        function hideEpisodeName() {
+            const episodeNameOverlay = document.getElementById('episode-name');
+            if (episodeNameOverlay) {
+                episodeNameOverlay.style.opacity = '0';
+            }
+        }
+
+        // === Back Button Function ===
+        function goBack() {
+            window.history.back();
+        }
+
+        // === Next Episode Overlay Control ===
+        let nextEpisodeOverlayShown = false;
+        let countdownSeconds = 15; // Starting countdown seconds
+
+        function showNextEpisodeOverlay() {
+            if (nextEpisodeOverlayShown) return;
+            nextEpisodeOverlayShown = true;
+
+            const overlay = document.getElementById('next-episode-overlay');
+            const thumbnail = document.getElementById('next-episode-thumbnail');
+            const title = document.getElementById('next-episode-title');
+            const countdown = document.getElementById('countdown-timer');
+
+            if (nextEpisode) {
+                thumbnail.src = nextEpisode.thumbnail_url || "{{ url_for('static', filename='images/default_thumbnail.png') }}";
+                title.textContent = `Next Episode: ${nextEpisode.name}`;
+                countdownSeconds = 15; // Reset countdown
+
+                countdown.textContent = `${countdownSeconds}`;
+                overlay.style.display = 'block';
+                console.log("Next Episode Overlay displayed");
+
+                countdownInterval = setInterval(() => {
+                    countdownSeconds--;
+                    if (countdownSeconds <= 0) {
+                        clearInterval(countdownInterval);
+                        playNextEpisode();
+                    } else {
+                        countdown.textContent = `${countdownSeconds}`;
+                    }
+                }, 1000);
+            } else {
+                console.warn("No next episode data available to display overlay");
+            }
+        }
+
+        function playNextEpisode() {
+            if (nextEpisode) {
+                const nextEpisodeId = nextEpisode.id;
+                const showId = "{{ show.id }}";
+                const nextPlayUrl = `/play/${nextEpisodeId}/${showId}`;
+                console.log(`Redirecting to next episode: ${nextPlayUrl}`);
+                window.location.href = nextPlayUrl;
+            } else {
+                console.warn("No next episode to play");
+            }
+        }
+
+        // === IMA SDK Initialization ===
+        function initIMA() {
+            if (typeof google === 'undefined' || typeof google.ima === 'undefined') {
+                console.error("Google IMA SDK not loaded properly.");
+                return;
+            }
+
+            adContainer = document.getElementById('ad-container');
+            if (!adContainer) {
+                console.error("Ad container element not found!");
+                return;
+            }
+
+            if (!adDisplayContainer) {
+                // Create the AdDisplayContainer if it hasn't been created yet
+                adDisplayContainer = new google.ima.AdDisplayContainer(adContainer);
+                console.log("AdDisplayContainer instance created");
+            }
+
+            if (!adsLoader) {
+                // Create AdsLoader if it hasn't been created yet
+                adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+                adsLoader.addEventListener(
+                    google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+                    onAdsManagerLoaded,
+                    false);
+                adsLoader.addEventListener(
+                    google.ima.AdErrorEvent.Type.AD_ERROR,
+                    onAdError,
+                    false);
+                console.log("AdsLoader initialized and event listeners added");
+            }
+
+            // No longer initializing AdDisplayContainer on click to avoid conflicts
+        }
+
+        // === AdsManager Event Handlers ===
+        function onAdsManagerLoaded(adsManagerLoadedEvent) {
+            console.log("AdsManagerLoaded event received.");
+            try {
+                adsManager = adsManagerLoadedEvent.getAdsManager(player.el());
+            } catch (adError) {
+                console.error("AdsManager could not be obtained:", adError);
+                onAdError();
+                return;
+            }
+
+            // Add event listeners to AdsManager
+            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
+            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
+            adsManager.addEventListener(google.ima.AdEvent.Type.AD_ERROR, onAdError);
+            adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, onAllAdsCompleted);
+            adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdEnded);
+
+            try {
+                adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
+                adsManager.start();
+                hideSpinner(); // Hide spinner after adsManager starts successfully
+                console.log("AdsManager initialized and started successfully.");
+            } catch (adError) {
+                console.error('AdsManager could not be started:', adError);
+                onAdError(); // Handle ad errors
+            }
+        }
+
+        function onAdEnded() {
+            if (adPlayed) {
+                adContainer.style.display = 'none';
+            }
+            player.el().style.pointerEvents = 'auto';
+            player.controls(true);
+            hideSpinner(); // Hide spinner when ad ends
+            retryCount = 0; // Reset retry count after a successful ad play
+            adRequestInProgress = false; // Reset the ad request flag
+            console.log("Ad ended successfully");
+        }
+
+        function onContentPauseRequested() {
+            player.pause();
+            player.controls(false);
+            player.el().style.pointerEvents = 'none';
+            adContainer.style.display = 'block';
+            adPlaying = true;
+            hideSpinner(); // Hide spinner when ad is about to play
+            console.log("Content paused for ad");
+        }
+
+        function onContentResumeRequested() {
+            player.removeClass('vjs-controls-hidden');
+            player.muted(false);
+            player.controls(true);
+            player.el().style.pointerEvents = 'auto';
+            adContainer.style.display = 'none';
+            adPlaying = false;
+            if (savedTime !== undefined) {
+                player.currentTime(savedTime);
+                savedTime = undefined;
+            }
+            player.play();
+            hideSpinner(); // Hide spinner when content resumes
+            console.log("Content resumed after ad");
+        }
+
+        function onAdError(adErrorEvent) {
+            if (adErrorEvent) {
+                console.error('Ad error:', adErrorEvent.getError());
+            }
+
+            if (adsManager) {
+                adsManager.destroy();
+                adsManager = null;
+            }
+
+            if (retryCount < MAX_RETRIES) {
+                retryCount++;
+                console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
+                // Keep the spinner visible during retries
+
+                adRequestInProgress = false; // Reset the ad request flag to allow retry
+
+                // Implementing a delay before retrying (exponential backoff)
+                setTimeout(() => {
+                    // Determine the ad type to retry
+                    const adType = prerollRequested && !postrollRequested ? 'preroll' :
+                                  postrollRequested ? 'postroll' : 'midroll';
+                    requestAds(adType); // Retry the same ad type
+                }, 1000 * retryCount); // 1s, 2s, 3s delays
+            } else {
+                console.error('Max ad retries reached. Proceeding without ads.');
+                adPlaying = false;
+                hideSpinner(); // Hide spinner when max retries reached
+                retryCount = 0; // Reset retry count
+                adRequestInProgress = false; // Reset the ad request flag
+                if (isPostroll) {
+                    console.log("Postroll ad failed to load.");
+                } else {
+                    player.play();
+                    hideSpinner(); // Ensure spinner is hidden if not already
+                }
+            }
+        }
+
+        function onAllAdsCompleted() {
+            adPlaying = false;
+            player.removeClass('vjs-controls-hidden');
+            player.play();
+            hideSpinner(); // Hide spinner when all ads are completed
+            retryCount = 0; // Reset retry count after ads complete
+            adRequestInProgress = false; // Reset the ad request flag
+            console.log("All ads completed successfully");
+        }
+
+        // === Ad Queue Processing ===
+        function processAdQueue() {
+            while (adRequestQueue.length > 0) {
+                const adType = adRequestQueue.shift();
+                requestAds(adType);
+            }
+        }
+
+        // === Request Ads Function ===
+        async function requestAds(adType = 'midroll') {
             if (adRequestInProgress) {
                 console.warn("Ad request already in progress. Skipping duplicate request.");
                 return;
             }
 
-            if (!imaSDKLoaded) {
-                console.warn("IMA SDK not loaded yet. Queuing ad request.");
-                adRequestQueue.push(true);
-                return;
-            }
-
             if (!adDisplayContainerInitialized) {
-                console.warn("AdDisplayContainer not initialized yet. Queuing ad request.");
-                adRequestQueue.push(true);
+                console.warn("AdDisplayContainer not initialized yet");
                 return;
             }
 
             adRequestInProgress = true; // Set the flag to indicate ad request is in progress
-            console.log("Starting ad request");
+            console.log(`Starting ${adType} ad request`);
 
             const timestamp = Date.now();
             const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
 
-            const currentIP = await getCurrentIP(false); // Changed to false as per user request
+            const currentIP = await getCurrentIP(false); // Use actual IP instead of random
 
             // Gather additional dynamic data
             const episodeName = "{{ episode.name }}";
@@ -621,6 +748,15 @@
                 { name: 'yob', placeholder: '[YOB]', value: undefined },
             ];
 
+            // Adjust parameters based on adType
+            if (adType === 'preroll') {
+                parameters.push({ name: 'ad_position', value: 'preroll' });
+            } else if (adType === 'postroll') {
+                parameters.push({ name: 'ad_position', value: 'postroll' });
+            } else {
+                parameters.push({ name: 'ad_position', value: 'midroll' });
+            }
+
             // Build the VAST URL
             let vastUrl = 'https://obs.ads.ottera.tv/v1/s2s-hb?';
 
@@ -647,261 +783,211 @@
             adsRequest.nonLinearAdSlotHeight = player.el().offsetHeight;
 
             // Make the ad request
-            adsLoader.requestAds(adsRequest);
-            console.log("Ads requested");
-        }
-
-        // Utility function to determine Operating System
-        function getOS() {
-            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-            if (/windows phone/i.test(userAgent)) {
-                return "Windows Phone";
-            }
-            if (/android/i.test(userAgent)) {
-                return "Android";
-            }
-            if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-                return "iOS";
-            }
-            if (/Win/i.test(userAgent)) {
-                return "Windows";
-            }
-            if (/Mac/i.test(userAgent)) {
-                return "MacOS";
-            }
-            if (/Linux/i.test(userAgent)) {
-                return "Linux";
-            }
-            return "Unknown";
-        }
-
-        // Utility function to determine Browser
-        function getBrowser() {
-            const userAgent = navigator.userAgent;
-            if (userAgent.indexOf("Firefox") > -1) {
-                return "Firefox";
-            } else if (userAgent.indexOf("SamsungBrowser") > -1) {
-                return "Samsung Internet";
-            } else if (userAgent.indexOf("Opera") > -1 || userAgent.indexOf("OPR") > -1) {
-                return "Opera";
-            } else if (userAgent.indexOf("Trident") > -1) {
-                return "Internet Explorer";
-            } else if (userAgent.indexOf("Edge") > -1) {
-                return "Edge";
-            } else if (userAgent.indexOf("Chrome") > -1) {
-                return "Chrome";
-            } else if (userAgent.indexOf("Safari") > -1) {
-                return "Safari";
-            }
-            return "Unknown";
-        }
-
-        function processAdQueue() {
-            while (adRequestQueue.length > 0) {
-                adRequestQueue.shift();
-                requestAds();
-            }
-        }
-
-        function onAdsManagerLoaded(adsManagerLoadedEvent) {
-            adsManager = adsManagerLoadedEvent.getAdsManager(player.el());
-            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
-            adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
-            adsManager.addEventListener(google.ima.AdEvent.Type.AD_ERROR, onAdError);
-            adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, onAllAdsCompleted);
-            adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdEnded);
-
             try {
-                adsManager.init(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
-                adsManager.start();
-                hideSpinner(); // Hide spinner after adsManager starts successfully
-                console.log("AdsManager initialized and started successfully");
-            } catch (adError) {
-                console.error('AdsManager could not be started:', adError);
-                onAdError(); // Call onAdError to handle retry logic
+                adsLoader.requestAds(adsRequest);
+                console.log("Ads requested");
+            } catch (error) {
+                console.error("Error requesting ads:", error);
+                hideSpinner(); // Hide spinner on failure
+                adRequestInProgress = false;
             }
         }
 
-        function onAdEnded() {
-            if (adPlayed) {
-                adContainer.style.display = 'none';
-            }
-            player.el().style.pointerEvents = 'auto';
-            player.controls(true);
-            hideSpinner(); // Hide spinner when ad ends
-            retryCount = 0; // Reset retry count after a successful ad play
-            adRequestInProgress = false; // Reset the ad request flag
-            console.log("Ad ended successfully");
-        }
+        // === Initialize the Player ===
+        function initializePlayer() {
+            console.log("Initializing Video.js player...");
+            // Dispose of existing player and ads if any
+            disposePlayer();
+            destroyAds();
 
-        function onContentPauseRequested() {
-            player.pause();
-            player.controls(false);
-            player.el().style.pointerEvents = 'none';
-            adContainer.style.display = 'block';
-            adPlaying = true;
-            hideSpinner(); // Hide spinner when ad is about to play
-            console.log("Content paused for ad");
-        }
+            let isMobileDevice = isMobile();
 
-        function onContentResumeRequested() {
-            player.removeClass('vjs-controls-hidden');
-            player.muted(false);
-            player.controls(true);
-            player.el().style.pointerEvents = 'auto';
-            adContainer.style.display = 'none';
-            adPlaying = false;
-            if (savedTime !== undefined) {
-                player.currentTime(savedTime);
-                savedTime = undefined;
-            }
-            player.play();
-            console.log("Content resumed after ad");
-        }
-
-        function onAdError(adErrorEvent) {
-            if (adErrorEvent) {
-                console.error('Ad error:', adErrorEvent.getError());
-            }
-
-            if (adsManager) {
-                adsManager.destroy();
-                adsManager = null;
-            }
-
-            if (retryCount < MAX_RETRIES) {
-                retryCount++;
-                console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
-                // Remove the hideSpinner() call here to keep the spinner visible during retries
-                // hideSpinner(); // Removed to keep spinner visible
-
-                adRequestInProgress = false; // Reset the ad request flag to allow retry
-
-                // Implementing a delay before retrying (optional but recommended)
-                setTimeout(() => {
-                    requestAds();
-                }, 1000 * retryCount); // Exponential backoff: 1s, 2s, etc.
-            } else {
-                console.error('Max ad retries reached. Proceeding without ads.');
-                adPlaying = false;
-                hideSpinner(); // Hide spinner when max retries reached
-                retryCount = 0; // Reset retry count
-                adRequestInProgress = false; // Reset the ad request flag
-                player.play();
-            }
-        }
-
-        function onAllAdsCompleted() {
-            adPlaying = false;
-            player.removeClass('vjs-controls-hidden');
-            player.play();
-            hideSpinner(); // Hide spinner when all ads are completed
-            retryCount = 0; // Reset retry count after ads complete
-            adRequestInProgress = false; // Reset the ad request flag
-            console.log("All ads completed successfully");
-        }
-
-        function handleTimeUpdate() {
-            if (adPlaying) {
-                return;
-            }
-            const currentTime = player.currentTime();
-            const duration = player.duration();
-            const bufferTime = 15; // seconds before the end to show the overlay
-
-            console.log(`Current Time: ${currentTime}, Duration: ${duration}, Buffer Time: ${bufferTime}`);
-
-            // Ensure duration is valid and greater than bufferTime
-            if (duration && (duration - currentTime <= bufferTime) && !nextEpisodeOverlayShown && nextEpisode) {
-                showNextEpisodeOverlay();
-            }
-
-            scteMarkers.forEach((marker, index) => {
-                // Exclude markers at time=0 to prevent duplicate preroll ads
-                if (marker.time > 0 && currentTime >= marker.time && index > lastPlayedCuePoint && !adPlaying) {
-                    adPlaying = true;
-                    lastPlayedCuePoint = index;
-                    player.pause();
-                    showSpinner(); // Show spinner when requesting mid-roll ads
-                    requestAds();
-                    console.log(`Mid-roll ad triggered at ${marker.time} seconds`);
+            player = videojs('my-video', {
+                autoplay: !isMobileDevice, // On mobile devices, do not autoplay
+                muted: !isMobileDevice, // On mobile devices, do not mute
+                controls: true,
+                playsinline: true,
+                fullscreen: {
+                    enabled: false
                 }
             });
-        }
 
-        let nextEpisodeOverlayShown = false;
-        let countdownSeconds = 15; // Updated countdown to 15 seconds
+            adContainer = document.getElementById('ad-container');
+            if (adContainer) {
+                adContainer.style.display = 'none';
+            } else {
+                console.error("Ad container element not found!");
+            }
 
-        function showNextEpisodeOverlay() {
-            if (nextEpisodeOverlayShown) return;
-            nextEpisodeOverlayShown = true;
+            adPlaying = false;
+            adPlayed = false;
+            scteMarkers = {{ scte_markers|safe }};
+            lastPlayedCuePoint = -1;
+            sessionId = generateSessionId();
+            adRequestQueue.length = 0;
+            prerollRequested = false;
+            postrollRequested = false;
+            savedTime = undefined;
+            retryCount = 0;
+            adRequestInProgress = false; // Reset the ad request flag
 
-            const overlay = document.getElementById('next-episode-overlay');
-            const thumbnail = document.getElementById('next-episode-thumbnail');
-            const title = document.getElementById('next-episode-title');
-            const countdown = document.getElementById('countdown-timer');
+            // === Separate Markers into Preroll, Midroll, and Postroll ===
+            scteMarkers.sort((a, b) => a.time - b.time);
+            console.log("SCTE Markers sorted:", scteMarkers);
 
-            if (nextEpisode) {
-                thumbnail.src = nextEpisode.thumbnail_url || "{{ url_for('static', filename='images/default_thumbnail.png') }}";
-                title.textContent = `Next Episode: ${nextEpisode.name}`;
-                countdownSeconds = 15; // Starting countdown seconds
+            scteMarkers.forEach(marker => {
+                if (marker.time === 0) {
+                    prerollMarker = marker;
+                    console.log(`Preroll marker identified at ${marker.time} seconds.`);
+                } else if (marker.time >= player.duration() - 0.5) {
+                    postrollMarker = marker;
+                    console.log(`Postroll marker identified at ${marker.time} seconds.`);
+                } else {
+                    midrollMarkers.push(marker);
+                    console.log(`Midroll marker detected at time=${marker.time} seconds.`);
+                }
+            });
 
-                countdown.textContent = `${countdownSeconds}`;
-                overlay.style.display = 'block';
-                console.log("Next Episode Overlay displayed");
+            // Sort midrollMarkers ascending
+            midrollMarkers.sort((a, b) => a.time - b.time);
+            console.log("Midroll Markers sorted:", midrollMarkers);
 
-                countdownInterval = setInterval(() => {
-                    countdownSeconds--;
-                    if (countdownSeconds <= 0) {
-                        clearInterval(countdownInterval);
-                        playNextEpisode();
+            player.on('timeupdate', handleTimeUpdate);
+            player.on('seeking', handleSeeking);
+
+            const episodeNameOverlay = document.getElementById('episode-name');
+            const episodeNameH2 = episodeNameOverlay ? episodeNameOverlay.querySelector('h2') : null;
+            if (episodeNameH2) {
+                episodeNameH2.textContent = "{{ episode.name }}";
+            }
+
+            player.on('loadedmetadata', function() {
+                console.log("Video metadata loaded.");
+                markersReady = true; // Mark that markers are ready
+            });
+
+            player.on('play', function() {
+                console.log("Play event triggered.");
+                if (!adDisplayContainerInitialized) {
+                    if (adDisplayContainer && adDisplayContainer.initialize) {
+                        try {
+                            adDisplayContainer.initialize();
+                            adDisplayContainerInitialized = true;
+                            console.log("AdDisplayContainer initialized.");
+                        } catch (error) {
+                            console.error("Error initializing AdDisplayContainer:", error);
+                            // Proceed without ads if initialization fails
+                            adDisplayContainerInitialized = false;
+                            adRequestInProgress = false;
+                            player.play();
+                            hideSpinner();
+                            return;
+                        }
                     } else {
-                        countdown.textContent = `${countdownSeconds}`;
+                        console.error("AdDisplayContainer or its initialize method is undefined.");
+                        // Proceed without ads if initialization fails
+                        adDisplayContainerInitialized = false;
+                        adRequestInProgress = false;
+                        player.play();
+                        hideSpinner();
+                        return;
                     }
-                }, 1000);
-            } else {
-                console.warn("No next episode data available to display overlay");
+                }
+
+                if (prerollMarker && !prerollRequested) {
+                    console.log("Preroll ad is set to play.");
+                    prerollRequested = true;
+                    adPlaying = true;
+                    player.pause();
+                    showSpinner(); // Show spinner when requesting preroll ads
+                    console.log("Requesting preroll ads...");
+                    // Introduce a slight delay to ensure AdDisplayContainer is fully initialized
+                    setTimeout(() => {
+                        requestAds('preroll');
+                    }, 100); // 100ms delay
+                    return;
+                }
+
+                if (adPlaying) {
+                    player.pause();
+                }
+                showEpisodeName();
+                setTimeout(hideEpisodeName, 3000);
+            });
+
+            player.on('pause', hideEpisodeName);
+            player.on('ended', function() {
+                console.log("Video ended.");
+                if (postrollMarker && !postrollRequested) {
+                    console.log("Postroll ad is set to play.");
+                    postrollRequested = true;
+                    adPlaying = true;
+                    showSpinner(); // Show spinner when requesting postroll ads
+                    requestAds('postroll');
+                    console.log("Requesting postroll ads...");
+                } else {
+                    if (adsLoader) {
+                        adsLoader.contentComplete();
+                    }
+                }
+            });
+
+            // Mouse and Touch Events
+            player.el().addEventListener('mousemove', handleMouseMove);
+            player.el().addEventListener('mouseenter', handleMouseEnter);
+            player.el().addEventListener('mouseleave', handleMouseLeave);
+            player.el().addEventListener('touchstart', handleTouch);
+            player.el().addEventListener('touchmove', handleTouch);
+            player.el().addEventListener('touchend', handleTouch);
+
+            console.log("Player initialized.");
+        }
+
+        // === Function to Dispose of the Player ===
+        function disposePlayer() {
+            if (player) {
+                console.log("Disposing existing Video.js player.");
+                // Remove event listeners to prevent duplication
+                player.off('timeupdate', handleTimeUpdate);
+                player.off('seeking', handleSeeking);
+                player.off('play');
+                player.off('pause');
+                player.off('ended');
+
+                player.el().removeEventListener('mousemove', handleMouseMove);
+                player.el().removeEventListener('mouseenter', handleMouseEnter);
+                player.el().removeEventListener('mouseleave', handleMouseLeave);
+                player.el().removeEventListener('touchstart', handleTouch);
+                player.el().removeEventListener('touchmove', handleTouch);
+                player.el().removeEventListener('touchend', handleTouch);
+
+                player.dispose();
+                player = null;
+                console.log("Player disposed.");
             }
         }
 
-        function playNextEpisode() {
-            if (nextEpisode) {
-                const nextEpisodeId = nextEpisode.id;
-                const showId = "{{ show.id }}";
-                const nextPlayUrl = `/play/${nextEpisodeId}/${showId}`;
-                console.log(`Redirecting to next episode: ${nextPlayUrl}`);
-                window.location.href = nextPlayUrl;
-            } else {
-                console.warn("No next episode to play");
+        // === Function to Destroy AdsManager ===
+        function destroyAds() {
+            if (adsManager) {
+                console.log("Destroying AdsManager.");
+                adsManager.destroy();
+                adsManager = null;
+                console.log("AdsManager destroyed.");
             }
         }
 
-        function handleSeeking() {
-            const currentTime = player.currentTime();
-            const bufferTime = 0.5;
-
-            lastPlayedCuePoint = scteMarkers.findIndex(marker => marker.time > currentTime) - 1;
-            lastPlayedCuePoint = Math.max(-1, Math.min(lastPlayedCuePoint, scteMarkers.length - 1));
-
-            const nextCuePoint = scteMarkers[lastPlayedCuePoint + 1];
-            if (nextCuePoint && currentTime >= nextCuePoint.time - bufferTime && !adPlaying) {
-                player.pause();
-                adPlaying = true;
-                savedTime = currentTime;
-                showSpinner(); // Show spinner when requesting ads due to seeking
-                requestAds();
-                console.log(`Seeking triggered ad request at ${currentTime} seconds`);
-            }
-        }
-
+        // === Window Resize Event to Resize AdsManager ===
         window.addEventListener('resize', function() {
             if (adsManager) {
                 adsManager.resize(player.el().offsetWidth, player.el().offsetHeight, google.ima.ViewMode.NORMAL);
-                console.log("AdsManager resized on window resize");
+                console.log("AdsManager resized on window resize.");
             }
         });
 
+        // === Before Unload Event to Cleanup ===
         window.addEventListener('beforeunload', function() {
+            console.log("Page is unloading. Cleaning up.");
             adRequestQueue.length = 0;
             lastPlayedCuePoint = -1;
             sessionId = generateSessionId();
@@ -909,39 +995,74 @@
             // Dispose player and ads to clean up
             disposePlayer();
             destroyAds();
-            console.log("Player and ads disposed on page unload");
+            console.log("Player and ads disposed on page unload.");
         });
 
-        function handleTouch() {
-            showEpisodeName();
-            resetMouseTimer();
+        // === Initialize the Player and IMA SDK ===
+        document.addEventListener('DOMContentLoaded', function() {
+            initIMA();          // Initialize IMA SDK first
+            initializePlayer(); // Then initialize the player
+        });
+
+        // === Function to Handle Time Updates for Midroll Ads and Next Episode Overlay ===
+        function handleTimeUpdate() {
+            if (adPlaying) {
+                return;
+            }
+
+            // Ensure markers are ready
+            if (!markersReady) {
+                console.log("Markers not ready yet. Skipping ad handling.");
+                return;
+            }
+
+            const currentTime = player.currentTime();
+            const duration = player.duration();
+            const bufferTime = 15; // seconds before the end to show the overlay
+
+            console.log(`Time Update - Current Time: ${currentTime}, Duration: ${duration}, Buffer Time: ${bufferTime}`);
+
+            // Ensure duration is valid and greater than bufferTime
+            if (duration && (duration - currentTime <= bufferTime) && !nextEpisodeOverlayShown && nextEpisode) {
+                console.log("Displaying Next Episode Overlay.");
+                showNextEpisodeOverlay();
+            }
+
+            // Trigger midroll ads sequentially
+            if (currentMidrollIndex < midrollMarkers.length) {
+                const nextMidrollMarker = midrollMarkers[currentMidrollIndex];
+                if (currentTime >= nextMidrollMarker.time && !adPlaying) {
+                    adPlaying = true;
+                    player.pause();
+                    showSpinner(); // Show spinner when requesting mid-roll ads
+                    console.log(`Mid-roll ad triggered at ${nextMidrollMarker.time} seconds.`);
+                    requestAds('midroll');
+                    currentMidrollIndex++;
+                }
+            }
         }
 
-        function showSpinner() {
-            const spinner = document.getElementById('spinner');
-            if (spinner) {
-                spinner.style.display = 'block';
-            }
-            const videoPlayer = document.querySelector('.video-js');
-            if (videoPlayer) {
-                videoPlayer.classList.add('hide-videojs-spinner');
-            }
-            console.log("Spinner shown");
-        }
+        // === Function to Handle Seeking for Ads ===
+        function handleSeeking() {
+            const currentTime = player.currentTime();
+            const bufferTime = 0.5;
 
-        function hideSpinner() {
-            const spinner = document.getElementById('spinner');
-            if (spinner) {
-                spinner.style.display = 'none';
-            }
-            const videoPlayer = document.querySelector('.video-js');
-            if (videoPlayer) {
-                videoPlayer.classList.remove('hide-videojs-spinner');
-            }
-            console.log("Spinner hidden");
-        }
+            // Find the first midroll marker after the current time
+            const newIndex = midrollMarkers.findIndex(marker => marker.time > currentTime);
+            lastPlayedCuePoint = newIndex - 1;
+            lastPlayedCuePoint = Math.max(-1, Math.min(lastPlayedCuePoint, midrollMarkers.length - 1));
 
-        initializePlayer();
+            const nextCuePoint = midrollMarkers[lastPlayedCuePoint + 1];
+            if (nextCuePoint && currentTime >= nextCuePoint.time - bufferTime && !adPlaying) {
+                player.pause();
+                adPlaying = true;
+                savedTime = currentTime;
+                showSpinner(); // Show spinner when requesting ads due to seeking
+                console.log(`Seeking triggered ad request at ${currentTime} seconds.`);
+                requestAds('midroll');
+                currentMidrollIndex = lastPlayedCuePoint + 2; // Move to the next marker
+            }
+        }
     </script>
 </body>
 </html>
