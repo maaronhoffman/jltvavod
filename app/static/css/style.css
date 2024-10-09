@@ -916,7 +916,7 @@ p.truncate a  {
 
 /* Logo Styling */
 .logo {
-    width: 100px !important;
+    width: 150px !important;
     display: flex;
     align-items: center;
     height: 70%;
@@ -924,7 +924,7 @@ p.truncate a  {
 
 .logo img {
     max-height: 70%;
-    width: auto;
+    width: 150px !important;
 }
 
 /* Navigation Links */
