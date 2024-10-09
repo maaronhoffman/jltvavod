@@ -185,10 +185,10 @@
         /* Next Episode Overlay Styles */
         #next-episode-overlay {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
+            bottom: 80px;
+            right: 40px;
             width: 250px;
-            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, .3));
             padding: 15px;
             border-radius: 10px;
             display: none; /* Hidden by default */
@@ -253,6 +253,13 @@
         #ad-info-overlay .ad-label {
             font-weight: bold;
             margin-right: 10px;
+        }
+
+        @media screen and (max-width: 768px) {
+            #ad-info-overlay {
+
+            display: none !important; /* Hidden by default */
+        }
         }
 
     </style>
