@@ -66,6 +66,32 @@
 </head>
 
 <body>
+    <header class="site-header">
+        <div class="header-content">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="JLTV Logo">
+            </div>
+            <nav class="nav-links desktop-nav">
+                <a href="https://jltv.tv">Home</a>
+                <a href="https://jltv.tv/network">Network</a>
+                <a href="https://jltv.tv/podcasts">Podcasts</a>
+                <a href="https://jltv.tv/watch">Watch</a>
+                <a href="https://jltv.tv/contact">Contact</a>
+            </nav>
+            <div class="hamburger-menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </header>
+    <nav class="mobile-nav">
+        <a href="https://jltv.tv">Home</a>
+        <a href="https://jltv.tv/network">Network</a>
+        <a href="https://jltv.tv/podcasts">Podcasts</a>
+        <a href="https://jltv.tv/watch">Watch</a>
+        <a href="https://jltv.tv/contact">Contact</a>
+    </nav>
     {% for row in custom_rows %}
         <h2 class="row-section-header">{{ row.name }}</h2>
         <div class="shows-container-wrapper">
@@ -111,3 +137,24 @@
     
 </body>
 </html>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const hamburger = document.querySelector('.hamburger-menu');
+        const mobileNav = document.querySelector('.mobile-nav');
+
+        hamburger.addEventListener('click', function() {
+            this.classList.toggle('active');
+            if (this.classList.contains('active')) {
+                mobileNav.style.display = 'block';
+                setTimeout(() => {
+                    mobileNav.classList.add('active');
+                }, 10);
+            } else {
+                mobileNav.classList.remove('active');
+                setTimeout(() => {
+                    mobileNav.style.display = 'none';
+                }, 300);
+            }
+        });
+    });
+</script>
