@@ -109,6 +109,10 @@
             .video-js .vjs-big-play-button {
                 display: none;
             }
+
+            .video-js .vjs-big-play-button .vjs-icon-placeholder:before {
+            display: none;
+            }
         }
 
         .video-js .vjs-big-play-button:hover {
@@ -305,7 +309,7 @@
     let adPlayed = false;
     let player, adContainer, adPlaying, scteMarkers, adsManager, adsLoader, lastPlayedCuePoint;
     let adDisplayContainerInitialized = false;
-    let retryCount = 0; // Initialize retry counter
+    let retryCount = 1; // Initialize retry counter
     let adDisplayContainer;
     let adRequestInProgress = false; // Flag to prevent multiple ad requests
     let isPostroll = false;
@@ -513,37 +517,38 @@ if (backButton) {
     let nextEpisodeOverlayShown = false;
     let countdownSeconds = 15; // Starting countdown seconds
 
-    function showNextEpisodeOverlay() {
-        if (nextEpisodeOverlayShown) return;
-        nextEpisodeOverlayShown = true;
+    function showNextEpisodeOverlay(timeRemaining) {
+    if (nextEpisodeOverlayShown) return;
+    nextEpisodeOverlayShown = true;
 
-        const overlay = document.getElementById('next-episode-overlay');
-        const thumbnail = document.getElementById('next-episode-thumbnail');
-        const title = document.getElementById('next-episode-title');
-        const countdown = document.getElementById('countdown-timer');
+    const overlay = document.getElementById('next-episode-overlay');
+    const thumbnail = document.getElementById('next-episode-thumbnail');
+    const title = document.getElementById('next-episode-title');
+    const countdown = document.getElementById('countdown-timer');
 
-        if (nextEpisode) {
-            thumbnail.src = nextEpisode.thumbnail_url || "{{ url_for('static', filename='images/default_thumbnail.png') }}";
-            title.textContent = `Next Episode: ${nextEpisode.name}`;
-            countdownSeconds = 15; // Reset countdown
+    if (nextEpisode) {
+        thumbnail.src = nextEpisode.thumbnail_url || "{{ url_for('static', filename='images/default_thumbnail.png') }}";
+        title.textContent = `Next Episode: ${nextEpisode.name}`;
+        countdownSeconds = Math.floor(timeRemaining);
 
-            countdown.textContent = `${countdownSeconds}`;
-            overlay.style.display = 'block';
-            console.log("Next Episode Overlay displayed");
+        countdown.textContent = `${countdownSeconds}`;
+        overlay.style.display = 'block';
+        console.log("Next Episode Overlay displayed");
 
-            countdownInterval = setInterval(() => {
-                countdownSeconds--;
-                if (countdownSeconds <= 0) {
-                    clearInterval(countdownInterval);
-                    playNextEpisode();
-                } else {
-                    countdown.textContent = `${countdownSeconds}`;
-                }
-            }, 1000);
-        } else {
-            console.warn("No next episode data available to display overlay");
-        }
+        countdownInterval = setInterval(() => {
+            countdownSeconds = Math.floor(player.duration() - player.currentTime());
+            if (countdownSeconds <= 0) {
+                clearInterval(countdownInterval);
+                playNextEpisode();
+            } else {
+                countdown.textContent = `${countdownSeconds}`;
+            }
+        }, 1000);
+    } else {
+        console.warn("No next episode data available to display overlay");
     }
+}
+
 
     function playNextEpisode() {
         if (nextEpisode) {
@@ -1145,6 +1150,7 @@ function initIMA(videoElement) {
     player.on('pause', hideEpisodeName);
     player.on('ended', function() {
         console.log("Video ended.");
+         clearInterval(countdownInterval); // Clear the countdown interval
         if (postrollMarker && !postrollRequested) {
             console.log("Postroll ad is set to play.");
             postrollRequested = true;
@@ -1316,15 +1322,15 @@ function initIMA(videoElement) {
 
         const currentTime = player.currentTime();
         const duration = player.duration();
+        const timeRemaining = duration - currentTime;
         const bufferTime = 15; // seconds before the end to show the overlay
 
         console.log(`Time Update - Current Time: ${currentTime}, Duration: ${duration}, Buffer Time: ${bufferTime}`);
 
         // Ensure duration is valid and greater than bufferTime
-        if (duration && (duration - currentTime <= bufferTime) && !nextEpisodeOverlayShown && nextEpisode) {
-            console.log("Displaying Next Episode Overlay.");
-            showNextEpisodeOverlay();
-        }
+        if (timeRemaining <= bufferTime && !nextEpisodeOverlayShown && nextEpisode) {
+        showNextEpisodeOverlay(timeRemaining);
+    }
 
         // Trigger midroll ads sequentially
         if (currentMidrollIndex < midrollMarkers.length) {

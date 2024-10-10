@@ -190,8 +190,10 @@ p, label, input {
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
-    opacity: .8 !important;
+    
     margin-bottom: 25px;
+    opacity: 1 !important;
+    color: white !important; /* Ensure text is white */
 }
 
 .row-section-header {
@@ -787,9 +789,11 @@ p.truncate a  {
     .show-logo {
     max-width: 300px;
     max-height: 250px;
+    padding: 4px;
     width: auto;
     height: auto;
     object-fit: contain;
+    overflow: visible;
     
 }
 
@@ -798,7 +802,7 @@ p.truncate a  {
     .show-logo {
         margin-top: 30px;
         max-width: 250px;
-        transform: scale(.8);
+        transform: scale(.9);
         
     }
 
@@ -811,6 +815,7 @@ p.truncate a  {
         justify-content: center !important;
         transform: scale(.7);
         margin-left: 0px !important;
+        margin-top: 100px;
         padding-right: 0% !important;
         padding-left: 0% !important;
     }
@@ -848,7 +853,7 @@ p.truncate a  {
     transition: opacity 0.3s;
     background-color: rgba(0, 0, 0, 0.5);
     padding: 5px 10px;
-    border-radius: 5px;
+    border-radius: 15px;
     z-index: 10;
 }
 
@@ -909,7 +914,15 @@ p.truncate a  {
     
     
 }
-
+.logo .alpha-tag {
+    font-size: 0.7em;
+    opacity: 0.5;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
 /* Header Content */
 .header-content {
     display: flex;
@@ -920,15 +933,15 @@ p.truncate a  {
 
 /* Logo Styling */
 .logo {
-    width: 150px !important;
+    width: 110px !important;
     display: flex;
     align-items: center;
-    height: 70%;
+    height: 50%;
 }
 
 .logo img {
-    max-height: 70%;
-    width: 150px !important;
+    max-height: 50%;
+    width: 110px !important;
 }
 
 /* Navigation Links */
@@ -1006,7 +1019,7 @@ p.truncate a  {
     top: 80px;
     left: 50%;
     transform: translateX(-50%) translateY(-20px);
-    width: 100%;
+    width: 94%;
     max-width: 1200px;
     background-color: rgba(24, 25, 24, .3);
     border-radius: 15px;
@@ -1027,7 +1040,7 @@ p.truncate a  {
     position: fixed;
     top: 80px;
     left: 50%;
-    width: 100%;
+    width: 92.5%;
     max-width: 1200px;
     background-color: rgba(24, 25, 24, .4);
     border-radius: 15px;

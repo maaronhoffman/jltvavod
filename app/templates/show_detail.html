@@ -9,8 +9,7 @@
     <script src="{{ url_for('static', filename='js/poster-glow.js') }}"></script>
     <script>
         document.documentElement.style.setProperty('--theme-color', '{{ show.theme_color or "rgba(255, 255, 255, 0.5)" }}');
-    
-        
+
         document.addEventListener('DOMContentLoaded', function() {
             const themeColor = '{{ show.theme_color or "#FFFFFF" }}';
             const rgb = hexToRgb(themeColor);
@@ -26,21 +25,274 @@
             } : null;
         }
     </script>
-  <style>
-    *,
-*::before,
-*::after {
-    box-sizing: border-box;
-}
-     
-    
-</style>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.8); 
+            justify-content: center;
+            align-items: center;
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: transparent;
+            padding: 0;
+            border: none;
+            width: 80%;
+            max-width: 800px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-radius: 10px;
+            margin: 0 auto;
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            color: #fff;
+            font-size: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        @keyframes fadeIn {
+            from {opacity: 0;}
+            to {opacity: 1;}
+        }
+
+        /* Cast Section Styles */
+        .cast-section {
+            padding: 20px 0; /* Remove horizontal padding */
+            background-color: #2c2c2c;
+            max-width: 1200px; /* Match the max-width of the banner */
+            margin: 0 auto; /* Center the section */
+            border-radius: 15px;
+            width: 94%;
+        }
+
+        .cast-section h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            margin-top: 0; /* Remove top margin */
+            color: #fff;
+           
+        }
+
+        .cast-scroll-container {
+            display: flex;
+            overflow-x: auto;
+            scroll-behavior: smooth;
+            gap: 20px;
+            padding-left: 20px; /* Added padding */
+            padding-right: 20px; /* Added padding */
+            padding-bottom: 20px;
+            padding-top: 20px;
+            /* Hide scrollbar */
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+            padding-left: 20px;
+            padding-right: 20px;
+            max-width: 100%; /* Ensure it doesn't exceed the parent's width */
+        }
+
+        .cast-scroll-container::-webkit-scrollbar {
+            display: none; /* Chrome, Safari and Opera */
+        }
+
+        .cast-card {
+            flex: 0 0 auto;
+            width: 200px;
+            background-color: #1d1d1d;
+            border-radius: 15px; /* Increased border-radius for rounded cards */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            overflow: hidden; /* Ensure child elements respect border-radius */
+            color: #fff;
+            transition: all 0.2s;
+        }
+
+        .cast-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--theme-color);
+        }
+
+        .cast-card img {
+            width: 100%;
+            height: 120px; /* Increased height */
+            object-fit: cover;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            object-position: top; /* Align image to the top */
+        }
+
+        .cast-card-content {
+            padding: 10px;
+            text-align: center;
+        }
+
+        .cast-card-content h3 {
+            margin: 10px 0 5px 0;
+            font-size: 1.1em;
+        }
+
+        .cast-card-content p {
+            margin: 0;
+            color: #ccc;
+            font-size: 0.9em;
+        }
+
+        /* Clips Section Styles */
+        .clips-section {
+            padding: 20px 0;
+            overflow: hidden;
+            max-width: 1200px; /* Match the max-width of the banner */
+            margin: 0 auto; /* Center the section */
+        }
+
+        .clips-section h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+            margin-top: 0;
+        }
+
+        .clips-grid {
+            display: flex;
+            gap: 20px;
+            padding: 0 20px;
+        }
+
+        .clip-card {
+            flex: 0 0 auto;
+            width: 280px;
+            cursor: pointer;
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+
+        .clip-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--theme-color);
+        }
+
+        .clip-card img {
+            width: 100%;
+            height: 170px;
+            object-fit: cover;
+            display: block;
+            object-position: bottom; /* This aligns the image to the top */
+        }
+
+        .clip-card .clip-title {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 10px;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .clips-grid {
+                overflow-x: auto;
+                scroll-behavior: smooth;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+
+            .clips-grid::-webkit-scrollbar {
+                display: none;
+            }
+        }
+
+        /* Trailer Link Styles */
+        .trailer-link {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 1em;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: background-color 0.3s;
+            text-decoration: none;
+            z-index: 10; /* Ensure the link is above other elements */
+        }
+
+        .trailer-link .trailer-content {
+            display: flex;
+            align-items: center;
+            pointer-events: none; /* Prevent child elements from capturing clicks */
+        }
+
+        .trailer-link:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .trailer-link img {
+            margin-right: 8px;
+            width: 20px;
+            height: 20px;
+        }
+        /* Responsive Adjustments */
+        @media (max-width: 600px) {
+            .cast-card {
+                width: 150px;
+            }
+
+            .trailer-link {
+                padding: 8px 16px;
+                font-size: 0.9em;
+            }
+
+            .cast-card img {
+                height: 90px; /* Adjusted height for mobile */
+            }
+
+            .clip-card img {
+                height: 150px;
+            }
+        }
+    </style>
 </head>
 <body>
     <header class="site-header">
         <div class="header-content">
             <div class="logo">
                 <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="JLTV Logo">
+                <span class="alpha-tag">Alpha</span>
             </div>
             <nav class="nav-links desktop-nav">
                 <a href="https://jltv.tv">Home</a>
@@ -63,9 +315,15 @@
         <a href="https://jltv.tv/watch">Watch</a>
         <a href="https://jltv.tv/contact">Contact</a>
     </nav>
-    <div class="show-detail-banner">
+    <div class="show-detail-banner" style="position: relative;">
         <div class="show-detail-banner-bg" style="background-image: url('{{ show.banner_poster_url }}');"></div>
         <a href="{{ url_for('main.show_selection') }}" class="back-button">Back</a>
+        <a href="#" class="trailer-link" onclick="openModal('https://www.youtube.com/embed/5bbJA5USuNA'); return false;" aria-label="Play Trailer">
+            <span class="trailer-content">
+                <img src="{{ url_for('static', filename='images/trailer.svg') }}" alt="Trailer Icon">
+                Trailer
+            </span>
+        </a>
         <div class="show-detail-banner-content">
             {% if show.logo_url %}
                 <img src="{{ show.logo_url }}" alt="{{ show.name }} Logo" class="show-logo">
@@ -133,28 +391,101 @@
         }
     }
     </script>
+
+    <!-- Cast Section -->
+    <div class="cast-section">
+        <h2>Cast</h2>
+        <div class="cast-scroll-container" id="cast-scroll-container">
+            <!-- Cast Member 2: Adaeze Nwanonyiri -->
+            <div class="cast-card">
+                <img src="https://static.wixstatic.com/media/e44e0b_87773c884bbd43e2b1cef5fa8c6f46fe~mv2.png" alt="Adaeze Nwanonyiri" loading="lazy">
+                <div class="cast-card-content">
+                    <h3>Adaeze Nwanonyiri</h3>
+                    <p style="opacity: .7;">Designer</p>
+                </div>
+            </div>
+            <!-- Cast Member 1: Lenny Rosenberg -->
+            <div class="cast-card">
+                <img src="https://static.wixstatic.com/media/e44e0b_7795b0ed4a4140b2b4d48879ba297aef~mv2.png" alt="Lenny Rosenberg" loading="lazy">
+                <div class="cast-card-content">
+                    <h3>Lenny Rosenberg</h3>
+                    <p style="opacity: .7;">Baker</p>
+                </div>
+            </div>
+            <!-- Add more cast members here if needed -->
+        </div>
+    </div>
+
+    <!-- Clips Section -->
+    <div class="clips-section">
+        <h2>Behind The Scenes</h2>
+        <div class="clips-grid">
+            <!-- Clip 1 -->
+            <div class="clip-card" onclick="openModal('https://www.youtube.com/embed/YUT6PqsgjZw')">
+                <img src="https://img.youtube.com/vi/YUT6PqsgjZw/hqdefault.jpg" alt="Exciting Moment" loading="lazy">
+                <div class="clip-title">Red Velvet Secrets</div>
+            </div>
+            <!-- Clip 2 -->
+            <div class="clip-card" onclick="openModal('https://www.youtube.com/embed/fIO3Vuy029A')">
+                <img src="https://img.youtube.com/vi/fIO3Vuy029A/hqdefault.jpg" alt="Behind the Scenes" loading="lazy">
+                <div class="clip-title">Cooking Is A Science</div>
+            </div>
+            <!-- Add more clips here as needed -->
+        </div>
+    </div>
+
+    <!-- Modal Structure -->
+    <div id="videoModal" class="modal">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <div class="modal-content">
+            <iframe id="modalVideo" width="100%" height="450" src="" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <script>
+        // Hamburger Menu Toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const hamburger = document.querySelector('.hamburger-menu');
+            const mobileNav = document.querySelector('.mobile-nav');
+
+            hamburger.addEventListener('click', function() {
+                this.classList.toggle('active');
+                if (this.classList.contains('active')) {
+                    mobileNav.style.display = 'block';
+                    setTimeout(() => {
+                        mobileNav.classList.add('active');
+                    }, 10);
+                } else {
+                    mobileNav.classList.remove('active');
+                    setTimeout(() => {
+                        mobileNav.style.display = 'none';
+                    }, 300);
+                }
+            });
+        });
+
+        // Modal Functions
+        function openModal(videoUrl) {
+            const modal = document.getElementById('videoModal');
+            const modalVideo = document.getElementById('modalVideo');
+            modal.style.display = 'flex';
+            modalVideo.src = videoUrl + "?autoplay=1";
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('videoModal');
+            const modalVideo = document.getElementById('modalVideo');
+            modal.style.display = 'none';
+            modalVideo.src = "";
+        }
+
+        // Close modal when clicking outside the video
+        window.onclick = function(event) {
+            const modal = document.getElementById('videoModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
 </body>
 </html>
-  <script>
-      document.addEventListener('DOMContentLoaded', function() {
-          const hamburger = document.querySelector('.hamburger-menu');
-          const mobileNav = document.querySelector('.mobile-nav');
-
-          hamburger.addEventListener('click', function() {
-              this.classList.toggle('active');
-              if (this.classList.contains('active')) {
-                  mobileNav.style.display = 'block';
-                  setTimeout(() => {
-                      mobileNav.classList.add('active');
-                  }, 10);
-              } else {
-                  mobileNav.classList.remove('active');
-                  setTimeout(() => {
-                      mobileNav.style.display = 'none';
-                  }, 300);
-              }
-          });
-      });
-  </script>
-
-  
