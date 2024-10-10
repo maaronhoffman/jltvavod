@@ -309,7 +309,7 @@
     let adPlayed = false;
     let player, adContainer, adPlaying, scteMarkers, adsManager, adsLoader, lastPlayedCuePoint;
     let adDisplayContainerInitialized = false;
-    let retryCount = 1; // Initialize retry counter
+    let retryCount = 0; // Initialize retry counter
     let adDisplayContainer;
     let adRequestInProgress = false; // Flag to prevent multiple ad requests
     let isPostroll = false;
@@ -727,7 +727,7 @@ function initIMA(videoElement) {
         player.el().style.pointerEvents = 'auto';
         player.controls(true);
         hideSpinner(); // Hide spinner when ad ends
-        retryCount = 1; // Reset retry count after a successful ad play
+        retryCount = 0; // Reset retry count after a successful ad play
         adRequestInProgress = false; // Reset the ad request flag
         console.log("Ad ended successfully");
 
@@ -822,7 +822,7 @@ function initIMA(videoElement) {
             console.error('Max ad retries reached. Proceeding without ads.');
             adPlaying = false;
             hideSpinner(); // Hide spinner when max retries reached
-            retryCount = 1; // Reset retry count
+            retryCount = 0; // Reset retry count
             adRequestInProgress = false; // Reset the ad request flag
             if (isPostroll) {
                 console.log("Postroll ad failed to load.");
@@ -838,7 +838,7 @@ function initIMA(videoElement) {
         player.removeClass('vjs-controls-hidden');
         player.play();
         hideSpinner(); // Hide spinner when all ads are completed
-        retryCount = 1; // Reset retry count after ads complete
+        retryCount = 0; // Reset retry count after ads complete
         adRequestInProgress = false; // Reset the ad request flag
         console.log("All ads completed successfully");
 
@@ -880,7 +880,7 @@ function initIMA(videoElement) {
         const timestamp = Date.now();
         const cacheBuster = `${timestamp}${Math.random().toString(36).substring(2)}`;
 
-        const currentIP = await getCurrentIP(true); // Use actual IP instead of random
+        const currentIP = await getCurrentIP(false); // Use actual IP instead of random
 
         // Gather additional dynamic data
         const episodeName = "{{ episode.name }}";
@@ -1066,7 +1066,7 @@ function initIMA(videoElement) {
     prerollRequested = false;
     postrollRequested = false;
     savedTime = undefined;
-    retryCount = 1;
+    retryCount = 0;
     adRequestInProgress = false; // Reset the ad request flag
     markersReady = false;
 

@@ -111,6 +111,7 @@ p, label, input {
       width: 300px;
       height: 169px;
       border-radius: 10px;
+      overflow: hidden;
       position: relative;
       transition: transform 0.3s, box-shadow 0.3s;
       --glow-color-rgb: 255, 255, 255; /* Default white */
@@ -184,7 +185,7 @@ p, label, input {
     font-size: 0.8rem;
     line-height: 1.4;
     margin-top: -5px;
-    overflow: hidden;
+   
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 3;
