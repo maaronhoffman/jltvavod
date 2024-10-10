@@ -3,12 +3,17 @@ from app.models import Show, Episode, Season, CustomRow, db
 from app.utils import process_media_playlist
 import json
 import logging
+import os
+
 
 bp = Blueprint('main', __name__)
 
 # Configure logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+if os.environ.get('FLASK_ENV') == 'production':
+    logger.setLevel(logging.ERROR)  # Only log errors in production
+else:
+    logger.setLevel(logging.DEBUG)  # Keep debug logging for development
 handler = logging.StreamHandler()
 formatter = logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s')
 handler.setFormatter(formatter)
