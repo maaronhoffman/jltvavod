@@ -3,7 +3,8 @@
 <head>
     <!-- Metadata and stylesheets -->
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
     <title>{{ show.name }} - {{ episode.name }}</title>
     <!-- Video.js and HLS.js -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -70,26 +71,23 @@
         }
         
         .video-js .vjs-big-play-button {
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    border: none;
-    background-color: rgba(43, 51, 63, 0.7);
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-}
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: none;
+            background-color: rgba(43, 51, 63, 0.7);
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+        }
 
-.video-js .vjs-big-play-button .vjs-icon-placeholder:before {
-    font-size: 60px;
-    line-height: 100px;
-    width: 100px;
-    height: 100px;
-}
-
-
-      
-
+        .video-js .vjs-big-play-button .vjs-icon-placeholder:before {
+            font-size: 60px;
+            line-height: 100px;
+            width: 100px;
+            height: 100px;
+        }
+        
         #ad-container {
             position: absolute;
             top: 0;
@@ -142,23 +140,6 @@
             display: block; /* Show ad container in fullscreen */
             z-index: 10000; /* Ensure it's above fullscreen elements */
         }
-
-        @media screen and (min-width: 900px) {
-            /* .video-js .vjs-big-play-button {
-                display: none;
-            }
-
-            .video-js .vjs-big-play-button .vjs-icon-placeholder:before {
-            display: none;
-            } */
-        }
-
-        /* .video-js .vjs-big-play-button:hover {
-            display: none;
-        }
-        .video-js.vjs-has-autoplay .vjs-big-play-button {
-            display: none !important;
-        } */
 
         #back-button {
             background-color: rgba(0, 0, 0, 0.6);
@@ -308,13 +289,6 @@
         #ad-info-overlay .ad-label {
             font-weight: bold;
             margin-right: 10px;
-        }
-
-        @media screen and (max-width: 600px) {
-            #ad-info-overlay {
-
-            display: none !important; /* Hidden by default */
-        }
         }
 
     </style>
@@ -1075,6 +1049,7 @@ function initIMA(videoElement) {
         // Configure the AdsRequest
         const adsRequest = new google.ima.AdsRequest();
         adsRequest.adTagUrl = vastUrl;
+        adsRequest.omitUiElements = ['countdown']; // Disable the countdown UI element
 
         // Set ad slot sizes
         adsRequest.linearAdSlotWidth = player.el().offsetWidth;
@@ -1125,7 +1100,8 @@ function initIMA(videoElement) {
     } else {
         console.error("Ad container element not found!");
     }
-
+    window.addEventListener("load", hideAddressBar);
+    window.addEventListener("orientationchange", hideAddressBar);
     adPlaying = false;
     adPlayed = false;
     scteMarkers = {{ scte_markers|safe }};
@@ -1518,6 +1494,34 @@ function detectAdBlocker() {
             console.log(`Seeking triggered ad request at ${currentTime} seconds.`);
             requestAds('midroll');
             currentMidrollIndex = lastPlayedCuePoint + 2; // Move to the next marker
+        }
+    }
+
+    let controlsTimeout;
+
+    function showControls() {
+        player.addClass('vjs-user-active');
+        clearTimeout(controlsTimeout);
+        controlsTimeout = setTimeout(hideControls, 3000); // Hide after 3 seconds of inactivity
+    }
+
+    function hideControls() {
+        player.removeClass('vjs-user-active');
+    }
+
+    player.on('mousemove', showControls);
+    player.on('touchstart', showControls);
+    player.on('click', showControls);
+
+    function hideAddressBar() {
+        if (document.documentElement.scrollHeight > window.outerHeight + 10) {
+            setTimeout(function() {
+                window.scrollTo(0, 1);
+            }, 0);
+        } else {
+            setTimeout(function() {
+                window.scrollTo(0, 1);
+            }, 0);
         }
     }
 </script>

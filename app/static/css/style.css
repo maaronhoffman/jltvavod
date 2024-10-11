@@ -116,6 +116,7 @@ p, label, input {
       transition: transform 0.3s, box-shadow 0.3s;
       --glow-color-rgb: 255, 255, 255; /* Default white */
       margin-right: 3px;
+      padding: 10px;
   }
 
   .show-card-link {
@@ -166,20 +167,21 @@ p, label, input {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
+
   }
 
   .air-day {
-      font-size: .9rem;
-      font-weight: bold;
-      text-transform: uppercase;
-      margin-bottom: -.3rem;
-      text-align: center;
-  }
+    font-size: 1rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: -5px; /* Reduce this value to lessen the gap */
+    margin-top: -10px;
+}
 
-  .air-time {
-      font-size: 0.9rem;
-      text-align: center;
-  }
+.show-air-time {
+    font-size: 1rem;
+    margin-top: 0.2rem; /* Reduce this value to bring it closer to the air day */
+}
 
 .show-card-text {
     font-size: 0.8rem;
@@ -778,7 +780,8 @@ p.truncate a  {
     opacity: 0;
     animation-fill-mode: forwards;
     z-index: 1;
-    margin-bottom: 20px;
+    margin-left: 90px;
+    transform: scale(1.1);
 
 }
 
@@ -813,11 +816,12 @@ p.truncate a  {
     .show-detail-banner-content {
         align-items: center;
         justify-content: center !important;
-        transform: scale(.7);
+        transform: scale(.8);
         margin-left: 0px !important;
-        margin-top: 100px;
+        margin-top: 80px;
         padding-right: 0% !important;
         padding-left: 0% !important;
+        margin-right: 0px !important;
     }
 
     .air-day {
@@ -836,6 +840,7 @@ p.truncate a  {
         padding-right: 50%;
         padding-left: 0%;
         transform: scale(.9);
+        margin-right: 120px;
        
     }
 
