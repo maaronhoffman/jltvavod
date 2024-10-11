@@ -12,8 +12,8 @@ with app.app_context():
     db.create_all()
 
     # Create a default user
-    username = 'admin'
-    password = 'password'  # Change this to a secure password
+    username = 'jltvwebdev'
+    password = 'J3w1sh2024!'  # Change this to a secure password
     hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
     user = User(username=username, password=hashed_password)

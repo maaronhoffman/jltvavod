@@ -13,6 +13,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    
+
     <style>
         /* Existing styles... */
 
@@ -946,7 +948,7 @@ function initIMA(videoElement) {
             { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '300' },
             { name: 'cb', placeholder: '[CACHEBUSTER]', value: cacheBuster },
             { name: 'ip', placeholder: '[IP]', value: currentIP },
-            { name: 'ua', placeholder: '[UA]', value: userAgent },
+            { name: 'ua', placeholder: '[UA]', value: undefined },
             { name: 'player_height', placeholder: '[HEIGHT]', value: player.el().offsetHeight },
             { name: 'player_width', placeholder: '[WIDTH]', value: player.el().offsetWidth },
             { name: 'is_lat', placeholder: '[LIMITED_AD_TRACKING]', value: '0' },
@@ -1336,27 +1338,56 @@ function initIMA(videoElement) {
         destroyAds();
         console.log("Player and ads disposed on page unload.");
     });
+
+    class AdblockDetector {
+    bannerIds;
+
+    constructor() {
+        this.bannerIds = [
+            'AdHeader',
+            'AdContainer',
+            'AD_Top',
+            'homead',
+            'ad-lead'
+        ];
+        this.init();
+    }
+
+    init() {
+        const dataContainer = document.createElement('div');
+        dataContainer.innerHTML = this.generatesBannersString();
+        document.body.appendChild(dataContainer);
+    }
+
+    detect() {
+        return !this.bannerIds.every(bannerId => this.checkVisibility(bannerId));
+    }
+
+    generatesBannersString() {
+        return this.bannerIds
+            .map(bannerId => `<div id="${bannerId}"></div>`)
+            .join('');
+    }
+
+    checkVisibility(bannerId) {
+        const el = document.querySelector(`#${bannerId}`);
+        if (el) return el.offsetParent;
+        return null;
+    }
+}
+
       // === Ad Blocker Detection ===
       function detectAdBlocker() {
-    const bait = document.createElement('div');
-    bait.className = 'adsbox';
-    bait.style.width = '1px';
-    bait.style.height = '1px';
-    bait.style.position = 'absolute';
-    bait.style.left = '-10000px';
-    document.body.appendChild(bait);
-
-    window.setTimeout(function() {
-        const adBlockDetected = bait.offsetParent === null || bait.offsetHeight === 0 || bait.offsetWidth === 0;
-        const adContainerDestroyed = !document.getElementById('ad-container') || document.getElementById('ad-container').children.length === 0;
-
-        if (adBlockDetected || adContainerDestroyed) {
-            console.log("Ad blocker detected or ad container destroyed.");
-            showAdBlockPrompt();
-        }
-        bait.remove();
-    }, 100);
+    const detector = new AdblockDetector();
+    if (detector.detect()) {
+        console.log("Ad blocker detected.");
+        showAdBlockPrompt();
+        handleAdBlockerDetected();
+    } else {
+        console.log("No ad blocker detected.");
+    }
 }
+
 
 function handleAdBlockerDetected() {
     // Disable ad-related functionality
@@ -1384,7 +1415,8 @@ function handleAdBlockerDetected() {
     // === Initialize the Player and IMA SDK ===
     document.addEventListener('DOMContentLoaded', function() {
         initializePlayer(); // Initialize the player first
-        initIMA();          // Then initialize the IMA SDK
+        initIMA();  
+        detectAdBlocker();        // Then initialize the IMA SDK
     });
 
     // === Function to Handle Time Updates for Midroll Ads and Next Episode Overlay ===
