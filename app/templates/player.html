@@ -1170,7 +1170,9 @@ function initIMA(videoElement) {
             setTimeout(() => {
                 requestAds('preroll');
             }, 100); // 100ms delay
-            return;
+        } else if (!adPlaying) {
+            // If no preroll or ad blocker detected, continue playing
+            player.play();
         }
 
         if (adPlaying) {
@@ -1336,25 +1338,38 @@ function initIMA(videoElement) {
     });
       // === Ad Blocker Detection ===
       function detectAdBlocker() {
-            // Create a bait element that ad blockers typically hide or remove
-            const bait = document.createElement('div');
-            bait.className = 'adsbox';
-            bait.style.width = '1px';
-            bait.style.height = '1px';
-            bait.style.position = 'absolute';
-            bait.style.left = '-10000px';
-            document.body.appendChild(bait);
+    const bait = document.createElement('div');
+    bait.className = 'adsbox';
+    bait.style.width = '1px';
+    bait.style.height = '1px';
+    bait.style.position = 'absolute';
+    bait.style.left = '-10000px';
+    document.body.appendChild(bait);
 
-            // Check if the bait element is visible
-            window.setTimeout(function() {
-                if (bait.offsetParent === null || bait.offsetHeight === 0 || bait.offsetWidth === 0) {
-                    // Ad blocker detected
-                    console.log("Ad blocker detected.");
-                    showAdBlockPrompt();
-                }
-                bait.remove();
-            }, 100);
+    window.setTimeout(function() {
+        const adBlockDetected = bait.offsetParent === null || bait.offsetHeight === 0 || bait.offsetWidth === 0;
+        const adContainerDestroyed = !document.getElementById('ad-container') || document.getElementById('ad-container').children.length === 0;
+
+        if (adBlockDetected || adContainerDestroyed) {
+            console.log("Ad blocker detected or ad container destroyed.");
+            showAdBlockPrompt();
         }
+        bait.remove();
+    }, 100);
+}
+
+function handleAdBlockerDetected() {
+    // Disable ad-related functionality
+    adPlaying = false;
+    prerollRequested = true; // Prevent preroll from being requested
+    
+    // Ensure the player starts without user interaction on desktop Safari
+    if (!isMobile() && getBrowser() === "Safari") {
+        player.ready(function() {
+            player.play();
+        });
+    }
+}
 
         function showAdBlockPrompt() {
             const prompt = document.getElementById('adblock-prompt');
