@@ -136,7 +136,7 @@
             z-index: 10000; /* Ensure it's above fullscreen elements */
         }
 
-        @media screen and (min-width: 768px) {
+        @media screen and (min-width: 900px) {
             .video-js .vjs-big-play-button {
                 display: none;
             }
@@ -1395,7 +1395,7 @@ function initIMA(videoElement) {
     const detector = new AdblockDetector();
     if (detector.detect()) {
         console.log("Ad blocker detected.");
-        handleAdBlockerDetected();
+        // handleAdBlockerDetected();
     } else {
         console.log("No ad blocker detected.");
     }
@@ -1441,7 +1441,7 @@ function showAdBlockPrompt() {
     document.addEventListener('DOMContentLoaded', function() {
         initializePlayer(); // Initialize the player first
         initIMA();  
-        detectAdBlocker();        // Then initialize the IMA SDK
+        // detectAdBlocker();        // Then initialize the IMA SDK
     });
 
     // === Function to Handle Time Updates for Midroll Ads and Next Episode Overlay ===
