@@ -1429,17 +1429,8 @@ function handleAdBlockerDetected() {
 function showAdBlockPrompt() {
     const prompt = document.getElementById('adblock-prompt');
     if (prompt) {
-        prompt.style.display = 'flex';
-        prompt.style.position = 'fixed';
-        prompt.style.top = '0';
-        prompt.style.left = '0';
-        prompt.style.width = '100%';
-        prompt.style.height = '100%';
-        prompt.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-        prompt.style.zIndex = '10000';
-        prompt.style.justifyContent = 'center';
-        prompt.style.alignItems = 'center';
-        prompt.style.flexDirection = 'column';
+        prompt.style.display = 'block';
+        
     }
 }
 
