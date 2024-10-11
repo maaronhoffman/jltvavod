@@ -1381,7 +1381,6 @@ function initIMA(videoElement) {
     const detector = new AdblockDetector();
     if (detector.detect()) {
         console.log("Ad blocker detected.");
-        showAdBlockPrompt();
         handleAdBlockerDetected();
     } else {
         console.log("No ad blocker detected.");
@@ -1406,10 +1405,10 @@ function handleAdBlockerDetected() {
     showAdBlockPrompt();
 
     // Optionally, you can also remove the player entirely
-    if (player) {
-        player.dispose();
-        player = null;
-    }
+    // if (player) {
+    //     player.dispose();
+    //     player = null;
+    // }
 }
 
 
