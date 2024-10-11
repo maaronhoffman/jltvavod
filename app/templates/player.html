@@ -167,6 +167,8 @@
             gap: 20px; /* Space between back button and show info */
             position: relative;
             z-index: 10001; /* Ensure it's above other elements */
+            overflow: hidden;
+            max-width: 100%;
         }
     
         /* Optional: Style for show-info div */
@@ -277,7 +279,7 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            background-color: rgba(0, 0, 0, 0.6);
+            background-color: rgba(107, 198, 255, 0.677);
             color: #fff;
             padding: 5px 10px;
             border-radius: 5px;
@@ -291,7 +293,7 @@
             margin-right: 10px;
         }
 
-        #ima-countdown {
+        .ima-countdown {
             display: none !important;
         }
 
@@ -708,7 +710,12 @@ function initIMA(videoElement) {
             onAdError();
             return;
         }
+            // Configure AdsRenderingSettings to omit the countdown
+    const adsRenderingSettings = new google.ima.AdsRenderingSettings();
+    adsRenderingSettings.omitUiElements = ['countdown']; // Disable the native countdown
 
+    // Apply the rendering settings to the AdsManager
+    adsManager.setRenderingSettings(adsRenderingSettings);
         // Add event listeners to AdsManager
         adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
         adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
@@ -1050,10 +1057,11 @@ function initIMA(videoElement) {
 
         console.log("VAST URL:", vastUrl); // For debugging purposes
 
+        const adsRenderingSettings = new google.ima.AdsRenderingSettings();
+        adsRenderingSettings.omitUiElements = ['countdown']; // Disable the native countdown
         // Configure the AdsRequest
         const adsRequest = new google.ima.AdsRequest();
         adsRequest.adTagUrl = vastUrl;
-        adsRequest.omitUiElements = ['countdown']; // Disable the countdown UI element
 
         // Set ad slot sizes
         adsRequest.linearAdSlotWidth = player.el().offsetWidth;
