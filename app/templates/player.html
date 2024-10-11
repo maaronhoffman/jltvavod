@@ -100,6 +100,35 @@
             display: none; /* Hidden by default */
         }
 
+        #adblock-prompt {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 10005; /* Above other elements */
+            display: none; /* Hidden by default */
+            text-align: center;
+        }
+
+        #adblock-prompt button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: #00a0ff;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        #adblock-prompt button:hover {
+            background-color: #008ecc;
+        }
+
         .video-js.vjs-fullscreen #ad-container {
             display: block; /* Show ad container in fullscreen */
             z-index: 10000; /* Ensure it's above fullscreen elements */
@@ -296,6 +325,10 @@
     <div id="ad-info-overlay">
         <span class="ad-label">Ad</span>
         <span class="ad-timer">00:00</span>
+    </div>
+    <div id="adblock-prompt">
+        <p>Please disable your ad blocker to watch JLTV+</p>
+        <button onclick="window.location.reload();">Reload Page</button>
     </div>
 </div>
 
@@ -1038,7 +1071,7 @@ function initIMA(videoElement) {
 
     player = videojs('my-video', {
         autoplay: isMobileDevice ? false : true, // Autoplay based on device
-        muted: isMobileDevice ? true : false,    // Ensure muted for autoplay compliance
+        muted: isMobileDevice ? true : true,    // Ensure muted for autoplay compliance
         controls: true,
         playsinline: true,
         controlBar: {
@@ -1301,6 +1334,37 @@ function initIMA(videoElement) {
         destroyAds();
         console.log("Player and ads disposed on page unload.");
     });
+      // === Ad Blocker Detection ===
+      function detectAdBlocker() {
+            // Create a bait element that ad blockers typically hide or remove
+            const bait = document.createElement('div');
+            bait.className = 'adsbox';
+            bait.style.width = '1px';
+            bait.style.height = '1px';
+            bait.style.position = 'absolute';
+            bait.style.left = '-10000px';
+            document.body.appendChild(bait);
+
+            // Check if the bait element is visible
+            window.setTimeout(function() {
+                if (bait.offsetParent === null || bait.offsetHeight === 0 || bait.offsetWidth === 0) {
+                    // Ad blocker detected
+                    console.log("Ad blocker detected.");
+                    showAdBlockPrompt();
+                }
+                bait.remove();
+            }, 100);
+        }
+
+        function showAdBlockPrompt() {
+            const prompt = document.getElementById('adblock-prompt');
+            if (prompt) {
+                prompt.style.display = 'block';
+            }
+        }
+
+        // Call ad blocker detection after a delay to ensure scripts have loaded
+        window.setTimeout(detectAdBlocker, 1000);
 
     // === Initialize the Player and IMA SDK ===
     document.addEventListener('DOMContentLoaded', function() {
