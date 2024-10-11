@@ -710,7 +710,9 @@ function initIMA(videoElement) {
             onAdError();
             return;
         }
-
+          // Configure AdsRenderingSettings to omit the countdown
+        const adsRenderingSettings = new google.ima.AdsRenderingSettings();
+        adsRenderingSettings.uiElements = [google.ima.UiElements.AD_ATTRIBUTION];
         // Add event listeners to AdsManager
         adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
         adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
