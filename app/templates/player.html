@@ -942,7 +942,7 @@ function initIMA(videoElement) {
 
         // Define the parameters in order
         const parameters = [
-            { name: 'site_id', placeholder: '49382', value: '49382' },
+            { name: 'site_id', placeholder: '50488', value: '50488' },
             { name: 'site_page', placeholder: '[SITE_PAGE]', value: sitePage },
             { name: 'format', placeholder: 'vast', value: 'vast' },
             { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '300' },
@@ -1390,17 +1390,28 @@ function initIMA(videoElement) {
 
 
 function handleAdBlockerDetected() {
-    // Disable ad-related functionality
-    adPlaying = false;
-    prerollRequested = true; // Prevent preroll from being requested
-    
-    // Ensure the player starts without user interaction on desktop Safari
-    if (!isMobile() && getBrowser() === "Safari") {
-        player.ready(function() {
-            player.play();
-        });
+    // Hide the video player
+    const videoContainer = document.getElementById('video-container');
+    if (videoContainer) {
+        videoContainer.style.display = 'none';
+    }
+
+    // Disable the player
+    if (player) {
+        player.pause();
+        player.controls(false);
+    }
+
+    // Show the ad blocker prompt
+    showAdBlockPrompt();
+
+    // Optionally, you can also remove the player entirely
+    if (player) {
+        player.dispose();
+        player = null;
     }
 }
+
 
         function showAdBlockPrompt() {
             const prompt = document.getElementById('adblock-prompt');
