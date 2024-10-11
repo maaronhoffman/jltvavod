@@ -901,7 +901,14 @@ function initIMA(videoElement) {
             clearInterval(adTimerInterval);
             adTimerInterval = null;
         }
+          // Ensure the player starts without user interaction on desktop Safari
+    if (!isMobile() && getBrowser() === "Safari") {
+        player.ready(function() {
+            player.play();
+        });
     }
+}
+    
 
     // === Ad Queue Processing ===
     function processAdQueue() {
