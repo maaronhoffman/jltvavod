@@ -290,10 +290,12 @@
             font-weight: bold;
             margin-right: 10px;
         }
-
+        
+                /* Hide native IMA countdown timer */
         .ima-countdown {
-            display: none !important
+            display: none !important;
         }
+
 
     </style>
 </head>
@@ -1053,7 +1055,6 @@ function initIMA(videoElement) {
         // Configure the AdsRequest
         const adsRequest = new google.ima.AdsRequest();
         adsRequest.adTagUrl = vastUrl;
-        adsRequest.omitUiElements = ['countdown']; // Disable the countdown UI element
 
         // Set ad slot sizes
         adsRequest.linearAdSlotWidth = player.el().offsetWidth;
