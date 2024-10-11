@@ -853,6 +853,13 @@ function initIMA(videoElement) {
             adTimerInterval = null;
         }
 
+         // Add this block to handle Safari ad blocking
+        if (!isMobile() && getBrowser() === "Safari") {
+            player.ready(function() {
+                player.play();
+            });
+        }
+
         if (retryCount < MAX_RETRIES) {
             retryCount++;
             console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
@@ -902,11 +909,7 @@ function initIMA(videoElement) {
             adTimerInterval = null;
         }
           // Ensure the player starts without user interaction on desktop Safari
-    if (!isMobile() && getBrowser() === "Safari") {
-        player.ready(function() {
-            player.play();
-        });
-    }
+   
 }
     
 
