@@ -710,9 +710,7 @@ function initIMA(videoElement) {
             onAdError();
             return;
         }
-          // Configure AdsRenderingSettings to omit the countdown
-        const renderingSettings = new google.ima.AdsRenderingSettings();
-        renderingSettings.setUiElements(ImmutableSet.of(UiElements.AD_ATTRIBUTION));
+      
 
         // Add event listeners to AdsManager
         adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
@@ -735,7 +733,7 @@ function initIMA(videoElement) {
 
     function onAdStarted(adEvent) {
         const ad = adEvent.getAd();
-        if (ad.isLinear()) {
+        if (ad.isLinear() && !isMobile()) {
             // Show the ad info overlay
             const adInfoOverlay = document.getElementById('ad-info-overlay');
             if (adInfoOverlay) {
@@ -772,6 +770,7 @@ function initIMA(videoElement) {
         adRequestInProgress = false; // Reset the ad request flag
         console.log("Ad ended successfully");
 
+        if (!isMobile()) {
         // Hide the ad info overlay
         const adInfoOverlay = document.getElementById('ad-info-overlay');
         if (adInfoOverlay) {
@@ -782,6 +781,7 @@ function initIMA(videoElement) {
             clearInterval(adTimerInterval);
             adTimerInterval = null;
         }
+    }
     }
 
     function onContentPauseRequested() {
@@ -811,6 +811,7 @@ function initIMA(videoElement) {
         hideSpinner(); // Hide spinner when content resumes
         console.log("Content resumed after ad");
 
+        if (!isMobile()) {
         // Hide the ad info overlay
         const adInfoOverlay = document.getElementById('ad-info-overlay');
         if (adInfoOverlay) {
@@ -821,6 +822,7 @@ function initIMA(videoElement) {
             clearInterval(adTimerInterval);
             adTimerInterval = null;
         }
+    }
     }
 
 
