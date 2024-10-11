@@ -255,6 +255,20 @@
             z-index: 99999;
         }
 
+        #adblock-prompt {
+    color: white;
+    text-align: center;
+    font-size: 24px;
+}
+
+#adblock-prompt button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+
         /* Custom Fullscreen Button Styles */
         .vjs-custom-fullscreen-button {
             width: 15px;
@@ -945,7 +959,7 @@ function initIMA(videoElement) {
             { name: 'site_id', placeholder: '50488', value: '50488' },
             { name: 'site_page', placeholder: '[SITE_PAGE]', value: sitePage },
             { name: 'format', placeholder: 'vast', value: 'vast' },
-            { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '300' },
+            { name: 'pod_duration', placeholder: '[POD_DURATION]', value: '60' },
             { name: 'cb', placeholder: '[CACHEBUSTER]', value: cacheBuster },
             { name: 'ip', placeholder: '[IP]', value: currentIP },
             { name: 'ua', placeholder: '[UA]', value: undefined },
@@ -1412,12 +1426,22 @@ function handleAdBlockerDetected() {
 }
 
 
-        function showAdBlockPrompt() {
-            const prompt = document.getElementById('adblock-prompt');
-            if (prompt) {
-                prompt.style.display = 'block';
-            }
-        }
+function showAdBlockPrompt() {
+    const prompt = document.getElementById('adblock-prompt');
+    if (prompt) {
+        prompt.style.display = 'flex';
+        prompt.style.position = 'fixed';
+        prompt.style.top = '0';
+        prompt.style.left = '0';
+        prompt.style.width = '100%';
+        prompt.style.height = '100%';
+        prompt.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        prompt.style.zIndex = '10000';
+        prompt.style.justifyContent = 'center';
+        prompt.style.alignItems = 'center';
+        prompt.style.flexDirection = 'column';
+    }
+}
 
         // Call ad blocker detection after a delay to ensure scripts have loaded
         
