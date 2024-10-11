@@ -37,11 +37,7 @@
             width: 100% !important;
             height: 100% !important;
         }
-        .video-js .vjs-big-play-button {
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
+      
         .vjs-controls-hidden .vjs-control-bar {
             display: none !important;
         }
@@ -73,23 +69,26 @@
             color: #ccc;
         }
         
-        .video-js .vjs-big-play-button .vjs-icon-placeholder:before {
-            content: '' !important;
-            background-image: url('/static/images/play.svg');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            border: none !important;
-            width: 200px;
-            height: 200px;
-        }
-
         .video-js .vjs-big-play-button {
-            background-color: transparent;
-            width: 200px;
-            height: 200px;
-            border-color: transparent;
-        }
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: none;
+    background-color: rgba(43, 51, 63, 0.7);
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+}
+
+.video-js .vjs-big-play-button .vjs-icon-placeholder:before {
+    font-size: 60px;
+    line-height: 100px;
+    width: 100px;
+    height: 100px;
+}
+
+
+      
 
         #ad-container {
             position: absolute;
@@ -137,21 +136,21 @@
         }
 
         @media screen and (min-width: 900px) {
-            .video-js .vjs-big-play-button {
+            /* .video-js .vjs-big-play-button {
                 display: none;
             }
 
             .video-js .vjs-big-play-button .vjs-icon-placeholder:before {
             display: none;
-            }
+            } */
         }
 
-        .video-js .vjs-big-play-button:hover {
+        /* .video-js .vjs-big-play-button:hover {
             display: none;
         }
         .video-js.vjs-has-autoplay .vjs-big-play-button {
             display: none !important;
-        }
+        } */
 
         #back-button {
             background-color: rgba(0, 0, 0, 0.6);
@@ -1094,9 +1093,10 @@ function initIMA(videoElement) {
     destroyAds();
 
     const isMobileDevice = isMobile(); // Correctly detect mobile devices
+    const isDesktopSafari = !isMobileDevice && getBrowser() === "Safari";
 
     player = videojs('my-video', {
-        autoplay: isMobileDevice ? false : true, // Autoplay based on device
+        autoplay: isDesktopSafari ? false : (isMobileDevice ? false : true), // Autoplay based on device
         muted: isMobileDevice ? true : true,    // Ensure muted for autoplay compliance
         controls: true,
         playsinline: true,
