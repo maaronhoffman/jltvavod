@@ -1206,25 +1206,66 @@ body {
 
 .episode-name-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 20px 0;
-    justify-content: left;
-   background: linear-gradient(to bottom, 
-    rgba(0, 0, 0, 0.95) 0%, 
-    rgba(0, 0, 0, 0.7) 30%, 
-    rgba(0, 0, 0, 0.5) 60%, 
-    rgba(0, 0, 0, 0) 100%); color: white;
+    top: 20px; /* Positioning 20px from the bottom */
+    left: 20px;   /* 20px from the left */
+    right: 20px;  /* 20px from the right */
+    background: rgba(0, 0, 0, 0.5); /* Semi-transparent background for readability */
+    padding: 10px 20px; /* Adjusted padding */
+    border-radius: 5px; /* Rounded corners */
+    box-sizing: border-box; /* Include padding in width and height calculations */
+    max-width: calc(100% - 40px); /* Prevent overflow */
+    overflow: hidden; /* Hide overflowing content */
+    white-space: nowrap; /* Prevent text wrapping */
+    text-overflow: ellipsis; /* Add ellipsis for overflowed text */
+    color: white;
     z-index: 2;
     opacity: 0;
     transition: opacity 1s ease-out;
     pointer-events: none;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
-.episode-name-overlay {
+/* Text Styling Inside the Overlay */
+.show-title-player,
+.episode-title-player {
     margin: 0;
-    padding: 0 20px;
-    font-size: 25px;
+    color: #ffffff; /* White text for better contrast */
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7); /* Text shadow for readability */
+    font-size: 1.6rem; /* Adjusted font size */
     font-weight: 900;
+}
+
+/* Media Query for Landscape Orientation on Mobile Devices */
+@media (orientation: landscape) and (max-width: 768px) {
+    .episode-name-overlay {
+        top: 10px; /* Reduce bottom spacing */
+        left: 10px;    /* Reduce left spacing */
+        right: 10px;   /* Reduce right spacing */
+        padding: 8px 10px;  /* Reduce padding */
+        max-width: calc(100% - 20px); /* Adjust max-width */
+        font-size: 1.4rem; /* Slightly smaller font size */
+    }
+
+    .show-title-player,
+    .episode-title-player {
+        font-size: 1.4rem; /* Adjusted font size for landscape */
+    }
+}
+
+/* Media Query for Smaller Devices and Portrait Orientation */
+@media (max-width: 480px) and (orientation: portrait) {
+    .episode-name-overlay {
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        padding: 8px 15px;
+        max-width: calc(100% - 30px);
+        font-size: 1.4rem;
+    }
+
+    .show-title-player,
+    .episode-title-player {
+        font-size: 1.4rem;
+    }
 }

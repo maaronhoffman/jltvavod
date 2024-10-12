@@ -3,7 +3,7 @@
 <head>
     <!-- Metadata and stylesheets -->
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
     <title>{{ show.name }} - {{ episode.name }}</title>
     <!-- Video.js and HLS.js -->
@@ -59,7 +59,6 @@
         .show-title-player {
             font-size: 24px;
             margin: 0 0 5px 0;
-            margin-top: 20px;
             color: white;
             font-weight: bold;
         }
@@ -141,7 +140,7 @@
         }
 
         #back-button {
-            background-color: rgba(0, 0, 0, 0.6);
+            background-color: rgba(0, 0, 0, 0.0);
             color: #fff;
             border: none;
             padding: 10px 15px;
@@ -156,7 +155,7 @@
         }
     
         #back-button:hover {
-            background-color: rgba(0, 0, 0, 0.8);
+            background-color: rgba(0, 0, 0, 0.3);
         }
     
         /* Arrange show-info-header elements in a row */
