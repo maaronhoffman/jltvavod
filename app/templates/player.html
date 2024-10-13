@@ -335,7 +335,7 @@
     </div>
     <!-- Ad Information Overlay -->
     <div id="ad-info-overlay">
-        <span class="content-label ad-label">Ad</span>
+        <span class="content-label ad-label"></span>
         <span class="ad-timer">00:00</span>
     </div>
 
@@ -1578,6 +1578,13 @@ function detectAdBlocker() {
             }, 0);
         }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    const adLabel = document.querySelector('#ad-info-overlay .ad-label');
+    if (adLabel) {
+        adLabel.textContent = 'Ad';
+    }
+});
 </script>
 </body>
 </html>
