@@ -880,7 +880,7 @@ function initIMA(videoElement) {
             });
         }
          // Hide the spinner immediately if ad loading fails
-        
+         hideSpinner();
         if (retryCount < MAX_RETRIES) {
             retryCount++;
             console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
