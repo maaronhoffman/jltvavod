@@ -894,7 +894,7 @@ function initIMA(videoElement) {
                 const adType = prerollRequested && !postrollRequested ? 'preroll' :
                               postrollRequested ? 'postroll' : 'midroll';
                 requestAds(adType); // Retry the same ad type
-            }, 200 * retryCount); // 1s, 2s, 3s delays
+            }, 10 * retryCount); // 1s, 2s, 3s delays
         } else {
             console.error('Max ad retries reached. Proceeding without ads.');
             adPlaying = false;
@@ -1509,6 +1509,7 @@ function detectAdBlocker() {
                 requestAds('midroll');
                 currentMidrollIndex++;
             }
+            hideSpinner();
         }
     }
 
@@ -1535,7 +1536,7 @@ function detectAdBlocker() {
                 hideSpinner();
                 player.play();
                 adPlaying = false;
-            }, 4000); // 4 seconds timeout
+            }, 3000); // 3 seconds timeout
 
             requestAds('midroll').then(() => {
                 clearTimeout(seekSpinnerTimeout);
