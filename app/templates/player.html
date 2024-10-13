@@ -287,12 +287,23 @@
         #ad-info-overlay .ad-label {
             font-weight: bold;
             margin-right: 10px;
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            font-family: Arial, Helvetica, sans-serif;
         }
-        
+
+        #ad-info-overlay .ad-label::before {
+           
+            display: inline-block;
+            font-weight: bold;
+        }
+
+                
                 /* Hide native IMA countdown timer */
-        .ima-countdown {
+        /* .ima-countdown {
             display: none !important;
-        }
+        } */
 
 
     </style>
@@ -324,9 +335,10 @@
     </div>
     <!-- Ad Information Overlay -->
     <div id="ad-info-overlay">
-        <span class="ad-label">Ad</span>
+        <span class="content-label ad-label">Ad</span>
         <span class="ad-timer">00:00</span>
     </div>
+
 </div>
 
 <div id="adblock-notification" class="adblock-notification">
@@ -868,7 +880,7 @@ function initIMA(videoElement) {
             });
         }
          // Hide the spinner immediately if ad loading fails
-        hideSpinner();
+        
         if (retryCount < MAX_RETRIES) {
             retryCount++;
             console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
