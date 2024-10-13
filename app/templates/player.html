@@ -471,29 +471,45 @@ if (backButton) {
     }
 
     // === Spinner Control ===
-    function showSpinner() {
-        const spinner = document.getElementById('spinner');
-        if (spinner) {
-            spinner.style.display = 'block';
-        }
-        const videoPlayer = document.querySelector('.video-js');
-        if (videoPlayer) {
-            videoPlayer.classList.add('hide-videojs-spinner');
-        }
-        console.log("Spinner shown");
-    }
+   // Declare a global variable to track the spinner timeout
+let spinnerTimeout;
 
-    function hideSpinner() {
-        const spinner = document.getElementById('spinner');
-        if (spinner) {
-            spinner.style.display = 'none';
-        }
-        const videoPlayer = document.querySelector('.video-js');
-        if (videoPlayer) {
-            videoPlayer.classList.remove('hide-videojs-spinner');
-        }
-        console.log("Spinner hidden");
+// === Spinner Control ===
+function showSpinner() {
+    const spinner = document.getElementById('spinner');
+    if (spinner) {
+        spinner.style.display = 'block';
     }
+    const videoPlayer = document.querySelector('.video-js');
+    if (videoPlayer) {
+        videoPlayer.classList.add('hide-videojs-spinner');
+    }
+    console.log("Spinner shown");
+
+    // Set a timeout to hide the spinner after 7 seconds (7000 milliseconds)
+    spinnerTimeout = setTimeout(() => {
+        console.warn("Spinner timeout reached. Hiding spinner as a fail-safe.");
+        hideSpinner();
+    }, 10000);
+}
+
+function hideSpinner() {
+    const spinner = document.getElementById('spinner');
+    if (spinner) {
+        spinner.style.display = 'none';
+    }
+    const videoPlayer = document.querySelector('.video-js');
+    if (videoPlayer) {
+        videoPlayer.classList.remove('hide-videojs-spinner');
+    }
+    console.log("Spinner hidden");
+
+    // Clear the timeout if hideSpinner is called before the 7-second timeout
+    if (spinnerTimeout) {
+        clearTimeout(spinnerTimeout);
+        spinnerTimeout = null;
+    }
+}
 
     // === Episode Name Overlay Control ===
     let mouseTimer;
@@ -851,7 +867,8 @@ function initIMA(videoElement) {
                 player.play();
             });
         }
-
+         // Hide the spinner immediately if ad loading fails
+        hideSpinner();
         if (retryCount < MAX_RETRIES) {
             retryCount++;
             console.warn(`Ad failed to load. Retrying (${retryCount}/${MAX_RETRIES})...`);
@@ -1500,10 +1517,27 @@ function detectAdBlocker() {
             savedTime = currentTime;
             showSpinner(); // Show spinner when requesting ads due to seeking
             console.log(`Seeking triggered ad request at ${currentTime} seconds.`);
-            requestAds('midroll');
+            
+            // Set a timeout to hide the spinner if the ad doesn't load
+            const seekSpinnerTimeout = setTimeout(() => {
+                hideSpinner();
+                player.play();
+                adPlaying = false;
+            }, 4000); // 4 seconds timeout
+
+            requestAds('midroll').then(() => {
+                clearTimeout(seekSpinnerTimeout);
+            }).catch(() => {
+                clearTimeout(seekSpinnerTimeout);
+                hideSpinner();
+                player.play();
+                adPlaying = false;
+            });
+
             currentMidrollIndex = lastPlayedCuePoint + 2; // Move to the next marker
         }
     }
+
 
     let controlsTimeout;
 
